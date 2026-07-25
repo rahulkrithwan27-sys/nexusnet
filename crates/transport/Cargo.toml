@@ -15,6 +15,13 @@ categories.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = []
+# Enables TLS-secured connections via `nexusnet-tls`. This pulls in the modern
+# TLS stack, which requires Rust 1.85 — hence a feature rather than a default.
+# Without it, `nexusnet-transport` builds on the workspace MSRV of 1.75.
+tls = ["dep:nexusnet-tls", "dep:nexusnet-encryption", "dep:rustls"]
+
 [dependencies]
 nexusnet-core = { workspace = true }
 nexusnet-protocol = { workspace = true }
@@ -23,6 +30,9 @@ bytes = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+nexusnet-tls = { workspace = true, optional = true }
+nexusnet-encryption = { workspace = true, optional = true }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-util", "time", "sync"] }

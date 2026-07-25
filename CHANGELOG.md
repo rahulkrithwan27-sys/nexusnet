@@ -271,6 +271,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 35 tests including a three-deep nested transform asserting a lossless round
     trip.
 
+- **`nexusnet-encryption` (Phase 4).** Authenticated encryption.
+  - `SessionCrypto` derives a per-direction key with HKDF-SHA256, seals and
+    opens messages with `ChaCha20-Poly1305` (default) or `AES-256-GCM`, and
+    supports rotation.
+  - Nonces come only from `NonceSequence`, which counts and refuses to wrap:
+    reusing a nonce under one key leaks the authentication key, so sending stops
+    instead.
+  - Separate keys per direction prevent a message being reflected back at its
+    sender and authenticating as the peer's.
+  - `ReplayFilter` rejects duplicates over a 64-message window while tolerating
+    reordering; authentication is verified before the filter is updated, so a
+    forgery cannot poison it into dropping genuine traffic.
+  - Decryption failures are deliberately indistinguishable from one another, to
+    avoid providing an attacker an oracle.
+  - `Key` zeroes itself on drop, compares in constant time, and redacts itself
+    from `Debug` output.
+  - The crate builds on the 1.75 MSRV; `zeroize` is pinned to 1.8.2 and its
+    derive macro avoided, keeping the dependency surface small.
+  - 43 tests covering tamper detection, associated-data binding, cross-cipher
+    rejection, replay, reordering, and rotation.
+
+- **TLS wired into the transport.** A new optional `tls` feature on
+  `nexusnet-transport` adds `connect_tls`, `connect_tls_default`, and
+  `TlsListener`, which return the ordinary framed `Connection` running over an
+  authenticated TLS 1.3 session. The feature is off by default, so plain builds
+  remain on the 1.75 MSRV; enabling it requires 1.85. Because `Connection<S>` is
+  generic over any `AsyncRead + AsyncWrite` stream, the integration is a thin
+  convenience layer rather than new protocol code. Includes an end-to-end
+  example and integration tests (hosted in `nexusnet-tls`, since they exercise
+  both crates and need the 1.85 toolchain), one asserting that an untrusted
+  server certificate prevents a framed connection from forming at all.
+
+- **Removed the global MSRV override in `clippy.toml`.** It hard-coded `1.75`,
+  which conflicted with the 1.85 `nexusnet-tls` crate and produced a
+  "MSRV differs" warning on every TLS compilation unit. Clippy reads each
+  crate's `rust-version` from its `Cargo.toml` automatically, so per-crate
+  values are now authoritative.
+
+- **Mutual TLS (client-certificate authentication).** `TlsConfigBuilder::build_server_with_client_auth` requires each connecting client to present a certificate chaining to a supplied trust store, and `build_client_with_cert` presents one. A client with no certificate or an untrusted one is rejected at the handshake; an empty client-trust store is refused at build time. Four integration tests cover the success path and each rejection.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

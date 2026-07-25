@@ -1,6 +1,6 @@
 [package]
 name = "nexusnet-encryption"
-description = "Cryptographic primitives and secure handshakes for NexusNet."
+description = "Authenticated encryption for the NexusNet networking framework."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,3 +16,18 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+aes-gcm = "0.10"
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
+rand_core = { version = "0.6", features = ["getrandom"] }
+sha2 = "0.10"
+subtle = "2.5"
+thiserror = { workspace = true }
+zeroize = "=1.8.2"
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

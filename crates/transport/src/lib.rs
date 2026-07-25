@@ -72,6 +72,9 @@ mod pool;
 mod reconnect;
 mod server;
 pub mod tcp;
+#[cfg(feature = "tls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tls")))]
+pub mod tls;
 mod udp;
 
 pub use crate::config::{
@@ -95,4 +98,8 @@ pub use crate::reconnect::{
     DEFAULT_MULTIPLIER,
 };
 pub use crate::tcp::{TcpConnection, TcpListener};
+#[cfg(feature = "tls")]
+pub use crate::tls::{
+    connect_tls, connect_tls_default, TlsClientConnection, TlsListener, TlsServerConnection,
+};
 pub use crate::udp::UdpEndpoint;

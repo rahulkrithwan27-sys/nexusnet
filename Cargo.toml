@@ -47,6 +47,7 @@ nexusnet-optimizer = { path = "crates/optimizer", version = "0.1.0" }
 nexusnet-protocol = { path = "crates/protocol", version = "0.1.0" }
 nexusnet-router = { path = "crates/router", version = "0.1.0" }
 nexusnet-telemetry = { path = "crates/telemetry", version = "0.1.0" }
+nexusnet-tls = { path = "crates/tls", version = "0.1.0" }
 nexusnet-plugin-api = { path = "crates/plugin_api", version = "0.1.0" }
 
 # --- Async runtime & IO primitives (used from later phases onward) ---

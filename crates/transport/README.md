@@ -237,3 +237,39 @@ and automatic reconnect are still to come. See
 ## License
 
 Licensed under the MIT license. See [`LICENSE`](../../LICENSE).
+
+
+## TLS (optional, requires Rust 1.85)
+
+The `tls` feature adds authenticated, encrypted connections built on
+`nexusnet-tls`. It is off by default, so a plain build stays on the 1.75 MSRV;
+enabling it pulls in the modern TLS stack, which needs 1.85.
+
+```rust
+# #[cfg(feature = "tls")]
+# async fn demo() -> Result<(), Box<dyn std::error::Error>> {
+use nexusnet_transport::tls::{connect_tls_default, TlsListener};
+use nexusnet_transport::TransportConfig;
+
+// Client: connect over TLS to a publicly-trusted server, get a framed
+// connection.
+let mut connection = connect_tls_default(
+    "example.com:8443".parse()?,
+    "example.com",
+    TransportConfig::default(),
+).await?;
+# Ok(())
+# }
+```
+
+Because `Connection<S>` is generic over any `AsyncRead + AsyncWrite` stream and
+the TLS streams are exactly that, this is a thin convenience layer, not new
+protocol machinery. `TlsListener::accept` and `connect_tls` return the same
+`Connection` type you already use — every framed operation works unchanged, now
+over TLS 1.3.
+
+Run the end-to-end example:
+
+```bash
+cargo run -p nexusnet-tls --example transport_echo
+```

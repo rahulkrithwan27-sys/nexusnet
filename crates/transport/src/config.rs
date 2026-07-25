@@ -40,6 +40,18 @@ pub enum Error {
         timeout: Duration,
     },
 
+    /// A TLS handshake or configuration failed.
+    ///
+    /// The most security-relevant failure: it includes certificate
+    /// verification, so a handshake error is what an interception attempt looks
+    /// like from inside the transport.
+    #[cfg(feature = "tls")]
+    #[error("TLS error: {reason}")]
+    Tls {
+        /// A description of what failed.
+        reason: String,
+    },
+
     /// The engine refused a lifecycle transition.
     ///
     /// For example, starting a server whose engine has already been shut down.

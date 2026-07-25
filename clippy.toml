@@ -3,9 +3,11 @@
 # The lint *levels* live in the root `Cargo.toml` under `[workspace.lints]`;
 # this file only tunes individual lint behavior.
 
-# Keep Clippy's suggestions compatible with our minimum supported Rust version
-# so it never proposes APIs newer than we support.
-msrv = "1.75"
+# Clippy reads each crate's `rust-version` from its `Cargo.toml` automatically
+# (since Rust 1.73), so the minimum supported version is not set here. Setting it
+# globally would override the per-crate value and, in particular, wrongly force
+# the 1.85 `nexusnet-tls` crate down to the workspace's 1.75 — which is exactly
+# the "MSRV differs" warning that override produced.
 
 # Product, protocol, and library names that legitimately contain intra-word
 # capitalization. Without this list, `clippy::doc_markdown` would flag every
