@@ -463,6 +463,9 @@ version = "0.1.0"
 [[package]]
 name = "nexusnet-optimizer"
 version = "0.1.0"
+dependencies = [
+ "criterion",
+]
 
 [[package]]
 name = "nexusnet-plugin-api"
@@ -484,6 +487,10 @@ version = "0.1.0"
 [[package]]
 name = "nexusnet-scheduler"
 version = "0.1.0"
+dependencies = [
+ "criterion",
+ "thiserror",
+]
 
 [[package]]
 name = "nexusnet-serializer"

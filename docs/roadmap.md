@@ -38,7 +38,7 @@ request that makes it.
 - ✅ Async runtime integration: `Server` binds listeners to the engine
   lifecycle, with a connection cap and bounded graceful shutdown.
 - QUIC, WebSocket, HTTP/2, and HTTP/3 transports.
-- Per-stream flow control (credit windows) to remove head-of-line blocking.
+- ✅ Per-stream flow control (credit windows) implemented in `nexusnet-scheduler`; wiring it into the multiplexer remains.
 
 ## Phase 4 — Security
 
@@ -50,8 +50,9 @@ request that makes it.
 - ✅ `nexusnet-cache`: LRU caching with expiry and byte-aware capacity, plus
   content-addressed deduplication. Delta synchronization and disk tiering
   remain.
-- `nexusnet-scheduler`: priority queueing, traffic shaping, rate limiting,
-  bandwidth estimation, adaptive sending, and retry management.
+- ✅ `nexusnet-scheduler`: weighted fair priority queueing, token-bucket rate
+  limiting, and per-stream credit-window flow control. Retry management and
+  adaptive sending policy remain.
 
 ## Phase 6 — Observability & routing
 
@@ -64,8 +65,9 @@ request that makes it.
 
 ## Phase 7 — Adaptive optimization
 
-- `nexusnet-optimizer`: bandwidth and congestion prediction; adaptive packet
-  sizing, compression level, retry timing, and quality; predictive scheduling.
+- ✅ `nexusnet-optimizer`: bandwidth and round-trip-time estimation with
+  adaptive payload sizing, compression level, and retry timing. Congestion
+  prediction and predictive scheduling remain.
 
 ## Phase 8 — Extensibility & SDKs
 

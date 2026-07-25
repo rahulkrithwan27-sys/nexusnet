@@ -145,6 +145,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 31 tests including order-index and TTL-counter consistency under churn,
     plus Criterion benchmarks.
 
+- **`nexusnet-scheduler` (Phase 5).** Traffic scheduling.
+  - `PriorityQueue` uses deficit round robin across five classes rather than
+    strict priority, so urgent traffic wins without starving anything else; a
+    test asserts background traffic still progresses at roughly the configured
+    16:1 ratio under saturation. Capacity is per class, so low-priority floods
+    cannot crowd out critical traffic.
+  - `TokenBucket` provides rate limiting with a burst allowance; every method
+    has an `_at` variant taking an explicit instant, so behavior is tested by
+    driving the clock rather than sleeping.
+  - `FlowController`, `SendWindow`, and `ReceiveWindow` implement per-stream
+    credit windows, the mechanism that removes head-of-line blocking from a
+    multiplexed session. Send and receive are distinct types since conflating
+    the directions is the classic flow-control bug, and a peer overrunning its
+    window is reported as a protocol violation rather than congestion.
+- **`nexusnet-optimizer` (Phase 7).** Adaptive optimization.
+  - `BandwidthEstimator` and `RttEstimator` provide exponentially weighted
+    estimates; the retransmission timeout follows Jacobson/Karels, using RTT
+    variation rather than the average alone so a jittery link does not produce
+    a hair-trigger timeout.
+  - `Optimizer` returns payload size from the bandwidth-delay product,
+    compression level from link speed, retry timeout from RTT, and bytes in
+    flight, along with a confidence flag so callers can ignore advice drawn from
+    too few samples.
+  - The crate produces advice only; it sends nothing and depends on no other
+    NexusNet crate, keeping policy separable from mechanism.
+  - 61 further tests across both crates.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

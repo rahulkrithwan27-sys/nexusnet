@@ -1,6 +1,6 @@
 [package]
 name = "nexusnet-scheduler"
-description = "Packet scheduling, traffic shaping, and rate limiting for NexusNet."
+description = "Priority scheduling, rate limiting, and flow control for the NexusNet networking framework."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,3 +16,11 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
