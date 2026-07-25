@@ -3,7 +3,7 @@
 //! Run with the `tls` feature (requires Rust 1.85):
 //!
 //! ```text
-//! cargo run -p nexusnet-tls --example transport_echo
+//! cargo run -p nexusnet-transport-tls --example echo
 //! ```
 //!
 //! It runs both ends in one process against a self-signed certificate, so it
@@ -14,8 +14,8 @@
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     use nexusnet_protocol::{Frame, FrameType};
     use nexusnet_tls::TlsConfigBuilder;
-    use nexusnet_transport::tls::{connect_tls, TlsListener};
     use nexusnet_transport::TransportConfig;
+    use nexusnet_transport_tls::{connect_tls, TlsListener};
     use rustls::pki_types::{CertificateDer, PrivateKeyDer};
     use rustls::RootCertStore;
     use tokio::net::TcpListener;

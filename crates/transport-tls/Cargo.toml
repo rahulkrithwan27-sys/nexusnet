@@ -1,0 +1,37 @@
+[package]
+name = "nexusnet-transport-tls"
+description = "TLS-secured framed connections for NexusNet: nexusnet-transport over nexusnet-tls."
+version.workspace = true
+edition.workspace = true
+# Requires Rust 1.85 via nexusnet-tls. Kept as a separate crate so neither
+# nexusnet-transport nor nexusnet-tls has to depend on the other for TLS support,
+# which would create a publish cycle.
+rust-version = "1.85"
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+nexusnet-transport = { workspace = true }
+nexusnet-tls = { workspace = true }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tokio = { workspace = true, features = ["net", "io-util"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+nexusnet-protocol = { workspace = true }
+bytes = { workspace = true }
+rcgen = "0.13"
+tokio = { workspace = true, features = ["full"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

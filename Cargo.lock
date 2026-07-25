@@ -740,10 +740,7 @@ dependencies = [
 name = "nexusnet-tls"
 version = "0.1.0"
 dependencies = [
- "bytes",
  "nexusnet-encryption",
- "nexusnet-protocol",
- "nexusnet-transport",
  "rcgen",
  "rustls",
  "rustls-pemfile",
@@ -762,10 +759,22 @@ dependencies = [
  "bytes",
  "criterion",
  "nexusnet-core",
- "nexusnet-encryption",
  "nexusnet-protocol",
  "nexusnet-scheduler",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "nexusnet-transport-tls"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "nexusnet-protocol",
  "nexusnet-tls",
+ "nexusnet-transport",
+ "rcgen",
  "rustls",
  "thiserror",
  "tokio",

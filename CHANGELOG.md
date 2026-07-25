@@ -311,6 +311,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Mutual TLS (client-certificate authentication).** `TlsConfigBuilder::build_server_with_client_auth` requires each connecting client to present a certificate chaining to a supplied trust store, and `build_client_with_cert` presents one. A client with no certificate or an untrusted one is rejected at the handshake; an empty client-trust store is refused at build time. Four integration tests cover the success path and each rejection.
 
+- **Extracted the TLS-transport integration into a new crate,
+  `nexusnet-transport-tls`.** Previously `nexusnet-transport` carried an optional
+  `tls` feature depending on `nexusnet-tls`, while `nexusnet-tls`'s tests depended
+  back on `nexusnet-transport`. That mutual dependency is a cycle crates.io cannot
+  publish. The integration now lives in its own crate that depends on both and is
+  depended on by neither, so every crate publishes cleanly. `connect_tls`,
+  `connect_tls_default`, and `TlsListener` moved there; import them from
+  `nexusnet_transport_tls` instead of `nexusnet_transport::tls`.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

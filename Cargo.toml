@@ -37,6 +37,7 @@ categories = ["network-programming", "asynchronous"]
 # --- Internal crates (path + version so they can also be published) ---
 nexusnet-core = { path = "crates/core", version = "0.1.0" }
 nexusnet-transport = { path = "crates/transport", version = "0.1.0" }
+nexusnet-transport-tls = { path = "crates/transport-tls", version = "0.1.0" }
 nexusnet-compression = { path = "crates/compression", version = "0.1.0" }
 nexusnet-serializer = { path = "crates/serializer", version = "0.1.0" }
 nexusnet-encryption = { path = "crates/encryption", version = "0.1.0" }

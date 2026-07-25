@@ -35,12 +35,6 @@ webpki-roots = "0.26"
 [dev-dependencies]
 rcgen = "0.13"
 tokio = { workspace = true, features = ["full"] }
-# For the transport-integration test. A dev-dependency cycle (transport depends
-# on tls; tls's tests depend on transport) is permitted by Cargo, unlike a
-# normal-dependency cycle.
-nexusnet-transport = { workspace = true, features = ["tls"] }
-nexusnet-protocol = { workspace = true }
-bytes = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true

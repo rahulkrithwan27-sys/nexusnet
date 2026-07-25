@@ -1,32 +1,60 @@
-//! TLS-secured framed connections.
+//! # nexusnet-transport-tls
 //!
-//! This module exists only when the `tls` feature is enabled. It ties
-//! [`nexusnet_tls`] to [`Connection`], so a caller gets a framed connection
-//! that runs over an authenticated TLS 1.3 session in one step rather than
-//! assembling the two layers by hand.
+//! TLS-secured framed connections: [`nexusnet_transport`] running over
+//! [`nexusnet_tls`].
 //!
-//! Because [`Connection`] is generic over any `AsyncRead + AsyncWrite` stream,
-//! and the TLS streams are exactly that, the integration is a thin convenience
-//! layer rather than new protocol machinery.
+//! This crate exists to keep the two lower crates independent. If
+//! `nexusnet-transport` depended on `nexusnet-tls` for an optional TLS feature
+//! while `nexusnet-tls` depended on `nexusnet-transport`, the two would form a
+//! publish cycle that crates.io cannot resolve. Putting the integration here —
+//! depending on both, depended on by neither — breaks that cycle.
 //!
-//! ## Feature and MSRV
+//! Because [`Connection`] is generic over any `AsyncRead + AsyncWrite` stream
+//! and the TLS streams are exactly that, this is a thin convenience layer, not
+//! new protocol machinery.
 //!
-//! The TLS stack requires Rust 1.85, above the crate's own 1.75 baseline. That
-//! requirement is confined to this feature: default builds of
-//! `nexusnet-transport` do not pull it in and remain buildable on 1.75.
+//! ## Minimum supported Rust version
+//!
+//! Requires **Rust 1.85** via `nexusnet-tls`. The rest of the workspace builds
+//! on 1.75.
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use nexusnet_tls::{ClientStream, ServerStream, TlsAcceptor, TlsConfigBuilder, TlsConnector};
+use nexusnet_transport::{Connection, TransportConfig};
 use tokio::net::TcpStream;
 
-use crate::config::{Error, Result, TransportConfig};
-use crate::connection::Connection;
+/// The result type used throughout this crate.
+pub type Result<T> = std::result::Result<T, Error>;
 
-pub use nexusnet_tls::{
-    export_key_client, export_key_server, load_certificates, load_private_key, SessionInfo,
-};
+/// Something went wrong establishing a TLS-secured connection.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// A TLS handshake or configuration failed.
+    ///
+    /// The most security-relevant failure: it includes certificate
+    /// verification, so a handshake error is what an interception attempt looks
+    /// like from inside the transport.
+    #[error("TLS error: {reason}")]
+    Tls {
+        /// A description of what failed.
+        reason: String,
+    },
+
+    /// The TCP connection could not be established in time.
+    #[error("connection to {address} timed out")]
+    ConnectTimeout {
+        /// The address attempted.
+        address: String,
+    },
+
+    /// An I/O error.
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+}
 
 /// A framed connection secured by TLS, client side.
 pub type TlsClientConnection = Connection<ClientStream<TcpStream>>;
@@ -59,7 +87,6 @@ pub async fn connect_tls(
             Err(_) => {
                 return Err(Error::ConnectTimeout {
                     address: address.to_string(),
-                    timeout: config.connect_timeout,
                 })
             }
         };
@@ -76,9 +103,6 @@ pub async fn connect_tls(
 }
 
 /// Connects using a client configuration that trusts the system roots.
-///
-/// A convenience over [`connect_tls`] for the common case of a
-/// publicly-trusted server certificate.
 ///
 /// # Errors
 ///
@@ -99,9 +123,6 @@ pub async fn connect_tls_default(
 }
 
 /// Accepts framed connections secured by TLS.
-///
-/// Wraps a [`tokio::net::TcpListener`] and a [`TlsAcceptor`], performing the
-/// handshake before handing back a framed connection.
 #[derive(Clone)]
 pub struct TlsListener {
     acceptor: TlsAcceptor,
@@ -118,10 +139,8 @@ impl TlsListener {
         }
     }
 
-    /// Accepts one connection from an already-accepted TCP stream.
-    ///
-    /// Separating the TCP accept from the TLS handshake lets a caller bound the
-    /// handshake, log the peer, or shed load before paying for the handshake.
+    /// Performs the TLS handshake on an already-accepted TCP stream and returns
+    /// a framed connection.
     ///
     /// # Errors
     ///

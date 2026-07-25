@@ -6,8 +6,8 @@
 
 use nexusnet_protocol::{Frame, FrameType};
 use nexusnet_tls::TlsConfigBuilder;
-use nexusnet_transport::tls::{connect_tls, TlsListener};
 use nexusnet_transport::TransportConfig;
+use nexusnet_transport_tls::{connect_tls, TlsListener};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::RootCertStore;
 use tokio::net::TcpListener;
