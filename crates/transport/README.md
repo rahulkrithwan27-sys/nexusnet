@@ -18,6 +18,7 @@ frames and a fragment — and `Connection` turns that back into whole frames.
 - **`ConnectionPool`** — reusable connections with idle expiry and automatic
   removal of connections left desynchronized by a failure.
 - **`ReconnectPolicy` / `connect_with_retry`** — exponential backoff with jitter.
+- **`Session`** — stream multiplexing: many logical streams over one connection.
 - **`TransportConfig`** — payload limits, buffer sizes, timeouts, socket options.
 
 ## Usage
@@ -121,6 +122,42 @@ Only connection *establishment* is retried. A mid-session failure surfaces to
 the caller rather than being silently reconnected, since a transparent
 reconnect would discard stream state the caller may care about.
 
+## Stream multiplexing
+
+One TCP connection can carry many independent conversations, because every
+frame names the stream it belongs to. `Session` turns that header field into an
+API.
+
+```rust
+let (handle, driver) = Session::start(connection, Role::Client, SessionConfig::default());
+tokio::spawn(driver.run());
+
+let mut first = handle.open_stream()?;
+let mut second = handle.open_stream()?;   // independent of the first
+
+first.send(Bytes::from_static(b"one")).await?;
+second.send(Bytes::from_static(b"two")).await?;
+# Ok::<(), nexusnet_transport::Error>(())
+```
+
+**Identifier parity** prevents collisions without negotiation. Both peers
+allocate stream identifiers, so the initiator's side determines parity: clients
+take odd numbers, servers even, and `0` is reserved for connection-level control
+frames. This is the convention HTTP/2 and QUIC use, for the same reason.
+
+**The driver owns the I/O.** `Session::start` splits the connection and returns
+a clonable handle plus a driver. Only the driver touches the socket — it routes
+inbound frames to the right stream and serializes outbound frames from every
+stream — so there is no locking on the hot path.
+
+### Flow control: a known limitation
+
+Per-stream inbound channels are bounded, which bounds memory. But a consumer
+that stops reading will eventually stall the driver, and that stalls **every**
+stream — classic head-of-line blocking. Proper per-stream flow control (a credit
+window, as HTTP/2 and QUIC use) belongs with the scheduler work in a later
+phase. Until then, consume promptly or raise `SessionConfig::stream_buffer`.
+
 ## Testing
 
 ```bash
@@ -132,7 +169,9 @@ read buffer that forces reassembly) *and* over real loopback sockets, where 500
 variable-length frames must arrive in order and multiple concurrent clients are
 served. Pooling tests cover reuse, idle capacity, expiry, and the refusal to
 reuse a broken connection; reconnection tests cover backoff bounds, jitter
-distribution, and recovery once a server appears.
+distribution, and recovery once a server appears. Multiplexing tests interleave
+three streams and assert each sees only its own payloads in order, and run eight
+concurrent streams over a single real socket.
 
 ## Status
 

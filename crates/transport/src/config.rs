@@ -40,6 +40,24 @@ pub enum Error {
         timeout: Duration,
     },
 
+    /// The session already has as many open streams as it permits.
+    #[error("cannot open another stream: the limit of {max} is reached")]
+    TooManyStreams {
+        /// The configured maximum number of concurrent streams.
+        max: usize,
+    },
+
+    /// The session driver has stopped, so no frame can be sent.
+    #[error("the session has closed")]
+    SessionClosed,
+
+    /// The stream was closed locally and cannot be written to.
+    #[error("stream {stream_id} is closed")]
+    StreamClosed {
+        /// The identifier of the closed stream.
+        stream_id: u32,
+    },
+
     /// A datagram did not fit the receive buffer and was truncated.
     ///
     /// Unlike a stream, a datagram cannot be reassembled from parts, so an

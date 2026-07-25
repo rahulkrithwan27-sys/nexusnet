@@ -17,6 +17,8 @@
 //! * [`ConnectionPool`] — reusable connections with idle expiry and automatic
 //!   removal of connections left desynchronized by a failure.
 //! * [`ReconnectPolicy`] — exponential backoff with jitter for dialing.
+//! * [`Session`] — stream multiplexing, carrying many logical streams over one
+//!   connection.
 //! * [`TransportConfig`] — payload limits, buffer sizes, timeouts, and socket
 //!   options.
 //!
@@ -63,6 +65,7 @@
 
 mod config;
 mod connection;
+mod mux;
 mod pool;
 mod reconnect;
 pub mod tcp;
@@ -72,7 +75,11 @@ pub use crate::config::{
     Error, Result, TransportConfig, DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_DATAGRAM,
     DEFAULT_READ_BUFFER,
 };
-pub use crate::connection::Connection;
+pub use crate::connection::{Connection, ConnectionReader, ConnectionWriter};
+pub use crate::mux::{
+    Role, Session, SessionConfig, SessionDriver, SessionHandle, SessionStats, Stream,
+    CONTROL_STREAM_ID, DEFAULT_MAX_STREAMS, DEFAULT_OUTBOUND_BUFFER, DEFAULT_STREAM_BUFFER,
+};
 pub use crate::pool::{
     ConnectionPool, PoolConfig, PoolStats, PooledConnection, DEFAULT_MAX_IDLE, DEFAULT_POOL_SIZE,
 };

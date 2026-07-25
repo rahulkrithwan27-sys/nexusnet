@@ -87,6 +87,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     rejection, backoff bounds, jitter distribution, and recovery once a server
     becomes reachable.
 
+- **Stream multiplexing (Phase 3).**
+  - `Session::start` splits a connection into a clonable `SessionHandle` and a
+    `SessionDriver`; only the driver touches the socket, routing inbound frames
+    to their stream and serializing outbound frames, so there is no locking on
+    the hot path.
+  - `Stream` carries one logical conversation, with `send`, `recv`, and `close`;
+    closing signals end-of-stream to the peer, and dropping a stream frees its
+    slot.
+  - Stream identifiers use role parity, as in HTTP/2 and QUIC: clients allocate
+    odd identifiers, servers even, and `0` is reserved for control frames, so
+    the two peers can allocate concurrently without negotiation or collision.
+  - `Connection::split` yields `ConnectionReader` and `ConnectionWriter`, so
+    reads and writes can proceed from separate tasks; both share one
+    implementation with `Connection` rather than duplicating the codec logic.
+  - Configurable stream limits, per-stream and session-wide buffers, and
+    automatic ping response; `SessionStats` reports streams opened, accepted,
+    closed, and frames dropped.
+  - 13 further tests, including three interleaved streams each seeing only
+    their own payloads in order, and eight concurrent streams over one real
+    socket.
+  - Known limitation: per-stream buffers bound memory but a stalled consumer
+    blocks the whole session (head-of-line blocking). Credit-window flow control
+    is deferred to the scheduler phase.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

@@ -102,11 +102,12 @@ where
     ///
     /// Returns [`Error::Io`] if the write fails.
     pub async fn send(&mut self, frame: &Frame) -> Result<()> {
-        self.encoder.encode(frame);
-        let bytes = self.encoder.take();
-
-        self.stream.write_all(&bytes).await?;
-        self.stream.flush().await?;
+        write_frames(
+            &mut self.stream,
+            &mut self.encoder,
+            std::slice::from_ref(frame),
+        )
+        .await?;
         self.frames_sent += 1;
 
         Ok(())
@@ -125,13 +126,7 @@ where
             return Ok(());
         }
 
-        for frame in frames {
-            self.encoder.encode(frame);
-        }
-        let bytes = self.encoder.take();
-
-        self.stream.write_all(&bytes).await?;
-        self.stream.flush().await?;
+        write_frames(&mut self.stream, &mut self.encoder, frames).await?;
         self.frames_sent += frames.len() as u64;
 
         Ok(())
@@ -169,26 +164,199 @@ where
     /// above. Protocol errors are fatal: the stream is desynchronized and the
     /// connection should be dropped.
     pub async fn recv(&mut self) -> Result<Option<Frame>> {
-        loop {
-            // Drain anything already buffered before issuing another read.
-            if let Some(frame) = self.decoder.next_frame()? {
-                self.frames_received += 1;
-                return Ok(Some(frame));
-            }
-
-            let read = self.stream.read(&mut self.read_buffer).await?;
-            if read == 0 {
-                let buffered = self.decoder.buffered();
-                return if buffered == 0 {
-                    Ok(None)
-                } else {
-                    Err(Error::UnexpectedEof { buffered })
-                };
-            }
-
-            self.decoder.push(&self.read_buffer[..read]);
+        let frame = read_next(&mut self.stream, &mut self.decoder, &mut self.read_buffer).await?;
+        if frame.is_some() {
+            self.frames_received += 1;
         }
+
+        Ok(frame)
     }
+}
+
+impl<S> Connection<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    /// Splits the connection into independent read and write halves.
+    ///
+    /// A multiplexed session needs to read and write concurrently from
+    /// separate tasks, which a single `&mut self` cannot express. Splitting
+    /// gives each direction its own owner; the codec state is directional
+    /// anyway, so the decoder travels with the reader and the encoder with the
+    /// writer.
+    #[must_use]
+    pub fn split(
+        self,
+    ) -> (
+        ConnectionReader<tokio::io::ReadHalf<S>>,
+        ConnectionWriter<tokio::io::WriteHalf<S>>,
+    ) {
+        let (read_half, write_half) = tokio::io::split(self.stream);
+
+        (
+            ConnectionReader {
+                reader: read_half,
+                decoder: self.decoder,
+                read_buffer: self.read_buffer,
+                frames_received: self.frames_received,
+            },
+            ConnectionWriter {
+                writer: write_half,
+                encoder: self.encoder,
+                frames_sent: self.frames_sent,
+            },
+        )
+    }
+}
+
+/// The reading half of a split [`Connection`].
+#[derive(Debug)]
+pub struct ConnectionReader<R> {
+    reader: R,
+    decoder: Decoder,
+    read_buffer: BytesMut,
+    frames_received: u64,
+}
+
+impl<R> ConnectionReader<R> {
+    /// Returns how many frames have been received.
+    #[must_use]
+    pub const fn frames_received(&self) -> u64 {
+        self.frames_received
+    }
+}
+
+impl<R> ConnectionReader<R>
+where
+    R: AsyncRead + Unpin,
+{
+    /// Receives the next frame.
+    ///
+    /// Behaves exactly like [`Connection::recv`], including the distinction
+    /// between a clean end-of-stream and a truncated frame.
+    ///
+    /// # Errors
+    ///
+    /// See [`Connection::recv`].
+    pub async fn recv(&mut self) -> Result<Option<Frame>> {
+        let frame = read_next(&mut self.reader, &mut self.decoder, &mut self.read_buffer).await?;
+        if frame.is_some() {
+            self.frames_received += 1;
+        }
+
+        Ok(frame)
+    }
+}
+
+/// The writing half of a split [`Connection`].
+#[derive(Debug)]
+pub struct ConnectionWriter<W> {
+    writer: W,
+    encoder: Encoder,
+    frames_sent: u64,
+}
+
+impl<W> ConnectionWriter<W> {
+    /// Returns how many frames have been sent.
+    #[must_use]
+    pub const fn frames_sent(&self) -> u64 {
+        self.frames_sent
+    }
+}
+
+impl<W> ConnectionWriter<W>
+where
+    W: AsyncWrite + Unpin,
+{
+    /// Sends a single frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Io`] if the write fails.
+    pub async fn send(&mut self, frame: &Frame) -> Result<()> {
+        write_frames(
+            &mut self.writer,
+            &mut self.encoder,
+            std::slice::from_ref(frame),
+        )
+        .await?;
+        self.frames_sent += 1;
+
+        Ok(())
+    }
+
+    /// Sends several frames in a single write.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Io`] if the write fails.
+    pub async fn send_all(&mut self, frames: &[Frame]) -> Result<()> {
+        if frames.is_empty() {
+            return Ok(());
+        }
+
+        write_frames(&mut self.writer, &mut self.encoder, frames).await?;
+        self.frames_sent += frames.len() as u64;
+
+        Ok(())
+    }
+
+    /// Shuts down the write half.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Io`] if the shutdown fails.
+    pub async fn shutdown(&mut self) -> Result<()> {
+        self.writer.shutdown().await?;
+        Ok(())
+    }
+}
+
+/// Reads until a whole frame is available, shared by the connection and its
+/// split reading half.
+async fn read_next<R>(
+    reader: &mut R,
+    decoder: &mut Decoder,
+    read_buffer: &mut BytesMut,
+) -> Result<Option<Frame>>
+where
+    R: AsyncRead + Unpin,
+{
+    loop {
+        // Drain anything already buffered before issuing another read.
+        if let Some(frame) = decoder.next_frame()? {
+            return Ok(Some(frame));
+        }
+
+        let read = reader.read(read_buffer).await?;
+        if read == 0 {
+            let buffered = decoder.buffered();
+            return if buffered == 0 {
+                Ok(None)
+            } else {
+                Err(Error::UnexpectedEof { buffered })
+            };
+        }
+
+        decoder.push(&read_buffer[..read]);
+    }
+}
+
+/// Encodes and writes frames, shared by the connection and its split writing
+/// half.
+async fn write_frames<W>(writer: &mut W, encoder: &mut Encoder, frames: &[Frame]) -> Result<()>
+where
+    W: AsyncWrite + Unpin,
+{
+    for frame in frames {
+        encoder.encode(frame);
+    }
+    let bytes = encoder.take();
+
+    writer.write_all(&bytes).await?;
+    writer.flush().await?;
+
+    Ok(())
 }
 
 #[cfg(test)]

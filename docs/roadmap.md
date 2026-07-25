@@ -33,8 +33,10 @@ request that makes it.
   versus truncation distinguished.
 - ✅ Connection pooling with idle expiry and broken-connection detection, and
   reconnection with exponentially backed-off, jittered retries.
+- ✅ Stream multiplexing with role-based identifier parity, per-stream
+  backpressure, and automatic ping response.
 - QUIC, WebSocket, HTTP/2, and HTTP/3 transports.
-- Stream multiplexing.
+- Per-stream flow control (credit windows) to remove head-of-line blocking.
 - Async runtime integration wired into the core engine lifecycle.
 
 ## Phase 4 — Security
