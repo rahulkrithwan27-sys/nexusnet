@@ -40,6 +40,12 @@ pub enum Error {
         timeout: Duration,
     },
 
+    /// The engine refused a lifecycle transition.
+    ///
+    /// For example, starting a server whose engine has already been shut down.
+    #[error("engine error: {0}")]
+    Engine(#[from] nexusnet_core::Error),
+
     /// The session already has as many open streams as it permits.
     #[error("cannot open another stream: the limit of {max} is reached")]
     TooManyStreams {

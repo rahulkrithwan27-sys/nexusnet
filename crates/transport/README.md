@@ -19,6 +19,8 @@ frames and a fragment — and `Connection` turns that back into whole frames.
   removal of connections left desynchronized by a failure.
 - **`ReconnectPolicy` / `connect_with_retry`** — exponential backoff with jitter.
 - **`Session`** — stream multiplexing: many logical streams over one connection.
+- **`Server`** — an accept loop bound to the engine lifecycle, with a
+  connection cap and bounded graceful shutdown.
 - **`TransportConfig`** — payload limits, buffer sizes, timeouts, socket options.
 
 ## Usage
@@ -157,6 +159,54 @@ that stops reading will eventually stall the driver, and that stalls **every**
 stream — classic head-of-line blocking. Proper per-stream flow control (a credit
 window, as HTTP/2 and QUIC use) belongs with the scheduler work in a later
 phase. Until then, consume promptly or raise `SessionConfig::stream_buffer`.
+
+## Serving
+
+`Server` is where the mechanisms become a framework. It accepts connections
+while the engine runs, caps concurrency, and stops cleanly.
+
+```rust
+let engine = Engine::builder().name("echo").build()?;
+let server = Server::bind("127.0.0.1:0", ServerConfig::default()).await?;
+let handle = server.handle();
+
+tokio::spawn(server.serve(engine, |mut connection: TcpConnection, _peer| async move {
+    while let Ok(Some(frame)) = connection.recv().await {
+        let _ = connection.send(&frame).await;
+    }
+}));
+
+handle.shutdown();   // stops accepting; in-flight work gets the grace period
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`Handler` is implemented automatically for closures returning a future, so the
+common case needs no explicit `impl`.
+
+Three behaviors worth knowing:
+
+- **The engine's lifecycle brackets the server's.** `serve` starts the engine if
+  it isn't running and shuts it down before returning, so there's one source of
+  truth for whether the process is live. Serving with an already-shut-down
+  engine is an error rather than a silent no-op.
+- **Shutdown is graceful but bounded.** In-flight connections get
+  `ServerConfig::shutdown_timeout`, defaulting to the engine's own value so the
+  process has a single shutdown budget. Connections still running when it
+  expires are reported as `abandoned` rather than waited on forever.
+- **One bad connection cannot kill the server.** A failed `accept` is logged and
+  the loop continues; handler errors belong to the handler.
+
+Beyond `max_connections`, connections are accepted and immediately closed, so
+the peer finds out at once instead of waiting in a backlog that may never drain.
+
+## Running the example
+
+```bash
+cargo run -p nexusnet-transport --example echo_server
+```
+
+Exercises the whole stack: engine lifecycle, server with graceful shutdown,
+framed round trips, and a client that reconnects with backoff.
 
 ## Testing
 

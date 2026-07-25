@@ -111,6 +111,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     blocks the whole session (head-of-line blocking). Credit-window flow control
     is deferred to the scheduler phase.
 
+- **Server and engine lifecycle integration (Phase 3).**
+  - `Server` accepts connections while its engine runs, starting the engine if
+    needed and shutting it down before returning, so the engine's lifecycle
+    brackets the server's exactly.
+  - `Handler` is implemented automatically for closures returning a future;
+    handler errors stay with the handler and a failed `accept` is logged rather
+    than terminating the server.
+  - `ServerConfig` caps simultaneous connections, with excess connections closed
+    immediately rather than queued in a backlog; shutdown grace defaults to the
+    engine's own `shutdown_timeout`.
+  - `ServerHandle` requests shutdown; `ServerStats` reports accepted, rejected,
+    active, peak, and abandoned connections.
+  - `nexusnet-transport` now depends on `nexusnet-core`, never the reverse, so
+    the core engine stays free of networking dependencies.
+  - A runnable `echo_server` example exercises the whole stack end to end.
+  - 12 further tests covering lifecycle bracketing, connection limits, graceful
+    drain, and the bounded grace period.
+
+- **`nexusnet-cache` (Phase 5).** Caching and content deduplication.
+  - `LruCache` bounds both entry count and total bytes, since neither limit
+    alone is sufficient for payloads whose sizes vary by orders of magnitude;
+    supports per-entry and default expiry, with lazy collection.
+  - Eviction uses an ordered index rather than scanning for the least recently
+    used entry, and expiry sweeps are skipped when no entry carries a TTL;
+    together these improved the eviction path by 11.7x.
+  - `Deduplicator` and `DedupStore` provide content-addressed deduplication,
+    replacing repeat payloads with a 16-byte digest reference; payloads below
+    64 bytes are never deduplicated, and an unresolvable reference reports a
+    miss so the sender can resend.
+  - `Digest` is a fast 128-bit non-cryptographic hash, documented as unsuitable
+    for deduplication across a trust boundary.
+  - 31 tests including order-index and TTL-counter consistency under churn,
+    plus Criterion benchmarks.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

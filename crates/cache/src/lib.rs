@@ -1,18 +1,35 @@
 //! # nexusnet-cache
 //!
-//! Smart caching layer for NexusNet with delta synchronization and deduplication.
+//! Caching and deduplication for NexusNet.
 //!
-//! ## Planned responsibilities
+//! ## What's here
 //!
-//! * LRU and TTL caches
-//! * Delta synchronization
-//! * Object deduplication
-//! * Memory-aware and on-disk tiers
+//! * [`LruCache`] — least-recently-used caching with optional per-entry expiry
+//!   and a byte-aware capacity, so a cache of variable-size network payloads can
+//!   be bounded by memory rather than entry count alone.
+//! * [`Deduplicator`] — content-addressed deduplication, so a payload that has
+//!   already crossed the wire is sent as a short digest reference instead of
+//!   again in full.
 //!
-//! ## Status
+//! ## Example
 //!
-//! This crate is workspace scaffolding established in Phase 1. Its public API is
-//! implemented in Phase 5. It currently exposes no items so that it compiles
-//! cleanly under the workspace's strict lint policy while the surrounding
-//! architecture is built out.
+//! ```
+//! use std::time::Duration;
+//! use nexusnet_cache::LruCache;
+//!
+//! let mut cache: LruCache<String, Vec<u8>> = LruCache::new(1024)
+//!     .with_max_bytes(8 * 1024 * 1024)
+//!     .with_default_ttl(Duration::from_secs(60));
+//!
+//! cache.insert("session:42".to_owned(), b"payload".to_vec());
+//! assert_eq!(cache.get("session:42").map(Vec::len), Some(7));
+//! ```
 #![cfg_attr(docsrs, feature(doc_cfg))]
+
+mod dedup;
+mod lru;
+
+pub use crate::dedup::{
+    DedupStats, DedupStore, Deduplicator, Digest, Reference, DEFAULT_MIN_DEDUP_SIZE,
+};
+pub use crate::lru::{CacheStats, EvictionReason, LruCache, Weight};

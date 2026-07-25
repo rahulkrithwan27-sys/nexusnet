@@ -16,6 +16,7 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+nexusnet-core = { workspace = true }
 nexusnet-protocol = { workspace = true }
 bytes = { workspace = true }
 thiserror = { workspace = true }
@@ -25,6 +26,9 @@ tracing = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-util", "time", "sync"] }
 criterion = { workspace = true }
+
+[[example]]
+name = "echo_server"
 
 [package.metadata.docs.rs]
 all-features = true

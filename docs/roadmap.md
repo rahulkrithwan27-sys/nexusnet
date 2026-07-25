@@ -35,9 +35,10 @@ request that makes it.
   reconnection with exponentially backed-off, jittered retries.
 - ✅ Stream multiplexing with role-based identifier parity, per-stream
   backpressure, and automatic ping response.
+- ✅ Async runtime integration: `Server` binds listeners to the engine
+  lifecycle, with a connection cap and bounded graceful shutdown.
 - QUIC, WebSocket, HTTP/2, and HTTP/3 transports.
 - Per-stream flow control (credit windows) to remove head-of-line blocking.
-- Async runtime integration wired into the core engine lifecycle.
 
 ## Phase 4 — Security
 
@@ -46,8 +47,9 @@ request that makes it.
 
 ## Phase 5 — Data movement & flow control
 
-- `nexusnet-cache`: LRU/TTL caches, delta synchronization, deduplication, and a
-  memory/disk tiering strategy.
+- ✅ `nexusnet-cache`: LRU caching with expiry and byte-aware capacity, plus
+  content-addressed deduplication. Delta synchronization and disk tiering
+  remain.
 - `nexusnet-scheduler`: priority queueing, traffic shaping, rate limiting,
   bandwidth estimation, adaptive sending, and retry management.
 

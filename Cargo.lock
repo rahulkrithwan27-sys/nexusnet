@@ -420,6 +420,11 @@ version = "0.1.0"
 [[package]]
 name = "nexusnet-cache"
 version = "0.1.0"
+dependencies = [
+ "bytes",
+ "criterion",
+ "thiserror",
+]
 
 [[package]]
 name = "nexusnet-cli"
@@ -502,6 +507,7 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "criterion",
+ "nexusnet-core",
  "nexusnet-protocol",
  "thiserror",
  "tokio",
