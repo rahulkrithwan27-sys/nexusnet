@@ -17,7 +17,7 @@ use crate::estimate::DEFAULT_SMOOTHING;
 ///
 /// Discriminants ascend with quality, so ordering comparisons read naturally
 /// and `min` selects the worst of several grades.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum NetworkQuality {
@@ -28,6 +28,9 @@ pub enum NetworkQuality {
     /// Workable, but with headroom worth conserving.
     Fair = 2,
     /// Comfortable for ordinary traffic.
+    ///
+    /// The default: assume a workable link until measurement says otherwise.
+    #[default]
     Good = 3,
     /// Fast, low latency, and essentially lossless.
     Excellent = 4,
@@ -137,12 +140,6 @@ impl NetworkQuality {
     #[must_use]
     pub fn worst_of(grades: &[Self]) -> Option<Self> {
         grades.iter().copied().min()
-    }
-}
-
-impl Default for NetworkQuality {
-    fn default() -> Self {
-        Self::Good
     }
 }
 
@@ -291,6 +288,15 @@ mod tests {
         assert!(NetworkQuality::Fair > NetworkQuality::Poor);
         assert!(NetworkQuality::Poor > NetworkQuality::Critical);
         assert_eq!(NetworkQuality::Excellent.score(), 4);
+    }
+
+    #[test]
+    fn the_default_grade_is_good() {
+        // Pinned deliberately: the default is derived via `#[default]`, and
+        // moving the attribute to another variant would silently change how
+        // every unmeasured link is treated.
+        assert_eq!(NetworkQuality::default(), NetworkQuality::Good);
+        assert!(!NetworkQuality::default().is_degraded());
     }
 
     #[test]

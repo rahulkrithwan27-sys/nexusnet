@@ -241,6 +241,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   component agrees. Criterion benchmarks cover both crates' hot paths — all
   under 120 ns per operation.
 
+- **Enum defaults now derived.** `NetworkQuality`, `Priority`, and `Strategy`
+  replace manual `Default` implementations with `#[derive(Default)]` and a
+  `#[default]` variant attribute, satisfying `clippy::derivable_impls` on newer
+  toolchains. Tests pin each default variant, since a misplaced attribute would
+  silently change behaviour rather than fail to compile.
+
+- **`scripts/check-lints.py`.** Catches the lints that newer clippy releases
+  reject but the MSRV toolchain misses — orphaned doc comments, byte-char
+  arrays, and derivable enum `Default` implementations — using only Python, and
+  reports every occurrence rather than stopping at the first. Wired into CI
+  alongside `cargo clippy`, not instead of it.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

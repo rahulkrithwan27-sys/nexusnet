@@ -16,6 +16,19 @@ set up and what we expect from a contribution.
    cargo test --workspace
    ```
 
+## A note on toolchain versions
+
+`clippy` gains lints with every release, so a workspace that is clean on the
+MSRV (1.75) can still fail on a newer toolchain. `derivable_impls`, `empty_line_after_doc_comments`, and `byte_char_slices` are
+examples that appeared after 1.75. Newer toolchains lint more than older ones,
+so run the checks on **stable** before opening a pull request, not only on the
+MSRV.
+
+`scripts/check-lints.py` catches the specific cases that have broken this build
+before, using nothing but Python. It is a stopgap rather than a substitute — it
+cannot know about lints it was not taught — so it runs in CI alongside, not
+instead of, `cargo clippy`.
+
 ## Before you open a pull request
 
 Every change must pass the same gates CI enforces:

@@ -95,7 +95,7 @@ async fn streams_stay_independent_when_interleaved() {
     accepted.sort_by_key(nexusnet_transport::Stream::id);
 
     // Each stream must see only its own payloads, in order.
-    for (index, tag) in [b'a', b'b', b'c'].into_iter().enumerate() {
+    for (index, tag) in (*b"abc").into_iter().enumerate() {
         let stream = &mut accepted[index];
         for round in 0..10_u8 {
             let payload = stream.recv().await.expect("a payload arrives");

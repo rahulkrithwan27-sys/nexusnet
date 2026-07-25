@@ -15,7 +15,7 @@ use std::collections::VecDeque;
 /// How urgent a queued item is.
 ///
 /// Discriminants ascend with urgency so ordering comparisons read naturally.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum Priority {
@@ -24,6 +24,7 @@ pub enum Priority {
     /// Ordinary work with no particular deadline.
     Low = 1,
     /// The default for application traffic.
+    #[default]
     Normal = 2,
     /// Interactive traffic that a user is waiting on.
     High = 3,
@@ -62,12 +63,6 @@ impl Priority {
     #[must_use]
     pub const fn index(self) -> usize {
         self as usize
-    }
-}
-
-impl Default for Priority {
-    fn default() -> Self {
-        Self::Normal
     }
 }
 

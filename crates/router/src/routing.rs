@@ -10,12 +10,15 @@ use std::time::Instant;
 use crate::health::{Health, HealthPolicy, HealthTracker};
 
 /// How the router chooses among healthy endpoints.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Strategy {
     /// Visit endpoints in order, one after another.
     ///
     /// Fair when endpoints are equivalent and requests cost about the same.
+    ///
+    /// The default.
+    #[default]
     RoundRobin,
     /// Visit endpoints in proportion to their weight.
     ///
@@ -26,12 +29,6 @@ pub enum Strategy {
     /// Adapts to requests of uneven cost, which round robin cannot: a backend
     /// stuck on a slow request stops attracting more work.
     LeastConnections,
-}
-
-impl Default for Strategy {
-    fn default() -> Self {
-        Self::RoundRobin
-    }
 }
 
 impl std::fmt::Display for Strategy {
@@ -488,6 +485,16 @@ mod tests {
                 .with_success_threshold(1)
                 .with_cooldown(Duration::from_secs(30)),
         )
+    }
+
+    #[test]
+    fn the_default_strategy_is_round_robin() {
+        // Pinned: the default is derived, so a misplaced `#[default]` would
+        // silently change how every router balances.
+        assert_eq!(Strategy::default(), Strategy::RoundRobin);
+
+        let router: Router<&str> = Router::default();
+        assert_eq!(router.strategy(), Strategy::RoundRobin);
     }
 
     #[test]
