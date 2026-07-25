@@ -1,6 +1,6 @@
 [package]
 name = "nexusnet-compression"
-description = "Pluggable compression codecs for NexusNet with adaptive and streaming support."
+description = "Adaptive payload compression (gzip, deflate, brotli, zstd) for the NexusNet networking framework."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,4 +15,30 @@ categories.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Pure-Rust codecs only, so the default build needs no C toolchain.
+default = ["gzip", "brotli"]
+# Gzip and raw DEFLATE via flate2's miniz_oxide backend.
+gzip = ["dep:flate2"]
+# Brotli; pure Rust.
+brotli = ["dep:brotli"]
+# Zstandard. Requires a C compiler to build.
+zstd = ["dep:zstd"]
+
 [dependencies]
+bytes = { workspace = true }
+thiserror = { workspace = true }
+flate2 = { workspace = true, optional = true }
+brotli = { workspace = true, optional = true }
+zstd = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "compression_bench"
+harness = false
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

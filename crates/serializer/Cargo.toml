@@ -1,6 +1,6 @@
 [package]
 name = "nexusnet-serializer"
-description = "Serialization backends for NexusNet payloads."
+description = "Payload serialization (MessagePack, JSON) for the NexusNet networking framework."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,4 +15,27 @@ categories.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = ["msgpack", "json"]
+# Compact binary encoding; the wire default.
+msgpack = ["dep:rmp-serde"]
+# Human-readable encoding for debugging and interop.
+json = ["dep:serde_json"]
+
 [dependencies]
+bytes = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+rmp-serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "serializer_bench"
+harness = false
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

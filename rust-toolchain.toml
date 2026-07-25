@@ -6,6 +6,6 @@
 # (`rust-version = "1.75"` in Cargo.toml); the MSRV is the *minimum* we support,
 # while this is the version we develop and release against.
 [toolchain]
-channel = "1.83.0"
-components = ["rustfmt", "clippy"]
+channel = "1.97.1"
+components = ["rustfmt", "clippy", "rust-src"]
 profile = "minimal"

@@ -13,13 +13,17 @@ request that makes it.
 - Scaffolding for every subsystem crate.
 - CI: formatting, Clippy (`-D warnings`), tests, build.
 
-## Phase 2 — Encoding foundations
+## Phase 2 — Encoding foundations ✅
 
-- `nexusnet-protocol`: wire format, framing, version negotiation.
-- `nexusnet-serializer`: MessagePack, Protocol Buffers, JSON, binary; schema
-  validation.
-- `nexusnet-compression`: Zstd, Gzip, Brotli; adaptive and streaming modes;
-  compression benchmarking.
+- ✅ `nexusnet-protocol`: wire format, framing, version negotiation.
+- ✅ `nexusnet-serializer`: MessagePack and JSON behind independent cargo
+  features, with format negotiation and size-limited decoding. Protocol Buffers
+  deferred: it needs a `.proto`/codegen workflow that is premature before the
+  message shapes settle, and `prost` can be added later without `protoc`.
+- ✅ `nexusnet-compression`: gzip, deflate, and brotli in a pure-Rust default
+  feature set, with zstd opt-in behind its C dependency. Adaptive policy skips
+  small and incompressible payloads, and decompression enforces an output limit
+  to reject decompression bombs.
 
 ## Phase 3 — Transport
 
