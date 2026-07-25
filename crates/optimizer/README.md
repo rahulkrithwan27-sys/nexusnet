@@ -13,6 +13,10 @@ measurements into sending decisions.
   estimates of each dimension.
 - **`CompressionStrategy`**, **`CacheStrategy`**, **`DeltaSyncStrategy`** — the
   individual decisions, usable on their own.
+- **`CongestionDetector`** / **`CongestionWindow`** — congestion predicted from
+  latency inflation, and the window that responds to it.
+- **`TrendPredictor`** / **`advise_send`** — where conditions are heading, and
+  what to do about it.
 - **`OptimizationMetrics`** — samples seen, quality transitions, and current
   estimates.
 - **`Optimizer`** — the narrower predecessor, producing a `Recommendation` from
@@ -76,6 +80,62 @@ and the risk of a stale base — which costs a whole extra round trip — outwei
 the bytes saved. A computed delta is also rejected if it isn't meaningfully
 smaller than the original; a delta saving 5% still costs both peers the work.
 
+## Predicting congestion, not reacting to it
+
+Loss-based congestion control waits for a packet to be dropped. By then the
+bottleneck queue is already full, every packet behind it has been delayed, and
+the loss is the *symptom* rather than the warning.
+
+Queues fill before they overflow, and a filling queue shows up as latency rising
+above the path's minimum. `CongestionDetector` watches that ratio and reports
+`Queueing` while there's still time to slow down — the insight behind TCP Vegas
+and later BBR.
+
+```rust
+use std::time::Duration;
+use nexusnet_optimizer::{CongestionDetector, CongestionSignal};
+
+let mut detector = CongestionDetector::new();
+for _ in 0..20 { detector.observe(Duration::from_millis(20)); }   // baseline
+for _ in 0..30 { detector.observe(Duration::from_millis(100)); }  // queue fills
+
+assert_eq!(detector.signal(), CongestionSignal::Queueing);
+assert_eq!(detector.loss_events(), 0);   // caught before anything dropped
+```
+
+Loss is still handled — it happens for reasons unrelated to congestion — but as
+the fallback, not the primary signal. `queueing_delay()` reports the latency a
+sender would recover by slowing down, which is the figure worth acting on.
+
+`CongestionWindow` responds with additive increase, multiplicative decrease. The
+asymmetry is deliberate: probing upward should be gradual, but backing off must
+be immediate, because the queue is already filling. A timeout collapses the
+window entirely, since it suggests the path stopped delivering rather than
+merely slowed.
+
+## Predictive scheduling
+
+Every other estimator answers "what is the network doing now" — always slightly
+stale, since a change has already happened by the time it's smoothed into an
+average. `TrendPredictor` answers "which way is it heading".
+
+It fits an ordinary least-squares line over a bounded window of recent samples.
+Deliberately simple: with a handful of noisy samples, an elaborate model
+produces confident nonsense. The `confidence` field is the coefficient of
+determination, so a line drawn through noise reports low confidence and
+`is_actionable()` returns false.
+
+The scheduling advice inverts naive intuition:
+
+- **Degrading** conditions → `SendAggressively`. Capacity is disappearing, so
+  move work while it exists.
+- **Improving** conditions → `Defer` bulk work briefly, and send it into better
+  conditions.
+- **Urgent** work is never deferred. A heartbeat doesn't wait for a better
+  moment.
+- **Congestion overrides the forecast** entirely — a filling queue is a present
+  fact, while a trend is an inference about the future.
+
 ## Advice, not action
 
 Nothing here sends, compresses, or caches anything, and the crate depends on no
@@ -85,6 +145,62 @@ policy testable in isolation and the mechanism crates independent of it.
 `OptimizationPlan::confident` reports whether the figures rest on enough
 measurement to act on. Acting hard on one or two samples is how an adaptive
 system starts oscillating.
+
+## Predicting congestion, not reacting to it
+
+Loss-based congestion control waits for a packet to be dropped. By then the
+bottleneck queue is already full, every packet behind it has been delayed, and
+the loss is the *symptom* rather than the warning.
+
+Queues fill before they overflow, and a filling queue shows up as latency rising
+above the path's minimum. `CongestionDetector` watches that ratio and reports
+`Queueing` while there's still time to slow down — the insight behind TCP Vegas
+and later BBR.
+
+```rust
+use std::time::Duration;
+use nexusnet_optimizer::{CongestionDetector, CongestionSignal};
+
+let mut detector = CongestionDetector::new();
+for _ in 0..20 { detector.observe(Duration::from_millis(20)); }   // baseline
+for _ in 0..30 { detector.observe(Duration::from_millis(100)); }  // queue fills
+
+assert_eq!(detector.signal(), CongestionSignal::Queueing);
+assert_eq!(detector.loss_events(), 0);   // caught before anything dropped
+```
+
+Loss is still handled — it happens for reasons unrelated to congestion — but as
+the fallback, not the primary signal. `queueing_delay()` reports the latency a
+sender would recover by slowing down, which is the figure worth acting on.
+
+`CongestionWindow` responds with additive increase, multiplicative decrease. The
+asymmetry is deliberate: probing upward should be gradual, but backing off must
+be immediate, because the queue is already filling. A timeout collapses the
+window entirely, since it suggests the path stopped delivering rather than
+merely slowed.
+
+## Predictive scheduling
+
+Every other estimator answers "what is the network doing now" — always slightly
+stale, since a change has already happened by the time it's smoothed into an
+average. `TrendPredictor` answers "which way is it heading".
+
+It fits an ordinary least-squares line over a bounded window of recent samples.
+Deliberately simple: with a handful of noisy samples, an elaborate model
+produces confident nonsense. The `confidence` field is the coefficient of
+determination, so a line drawn through noise reports low confidence and
+`is_actionable()` returns false.
+
+The scheduling advice inverts naive intuition:
+
+- **Degrading** conditions → `SendAggressively`. Capacity is disappearing, so
+  move work while it exists.
+- **Improving** conditions → `Defer` bulk work briefly, and send it into better
+  conditions.
+- **Urgent** work is never deferred. A heartbeat doesn't wait for a better
+  moment.
+- **Congestion overrides the forecast** entirely — a filling queue is a present
+  fact, while a trend is an inference about the future.
 
 ## Advice, not action
 
@@ -144,8 +260,7 @@ cargo test -p nexusnet-optimizer
 
 ## Status
 
-Implemented in **Phase 7**. Congestion prediction and predictive scheduling are
-still to come. See [`docs/roadmap.md`](../../docs/roadmap.md).
+Implemented in **Phase 7**, complete. See [`docs/roadmap.md`](../../docs/roadmap.md).
 
 ## License
 

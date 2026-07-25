@@ -54,20 +54,21 @@ request that makes it.
   limiting, and per-stream credit-window flow control. Retry management and
   adaptive sending policy remain.
 
-## Phase 6 — Observability & routing
+## Phase 6 — Observability & routing ✅
 
-- `nexusnet-analytics`: bandwidth, compression ratio, packet loss, latency, RTT,
-  jitter, CPU/RAM, and connection statistics.
-- `nexusnet-router`: route resolution, path selection, load balancing, and
-  health-aware failover.
-- `nexusnet-telemetry`: metrics export, distributed tracing integration, and
-  dashboard feeds.
+- ✅ `nexusnet-analytics`: bounded-memory latency and jitter distributions with
+  percentiles, throughput metering, and per-connection statistics.
+- ✅ `nexusnet-router`: round-robin, weighted, and least-connections load
+  balancing with circuit-breaker failover and probe-based recovery.
+- ✅ `nexusnet-telemetry`: a metrics registry with Prometheus and JSON export.
+  Distributed tracing integration remains.
 
-## Phase 7 — Adaptive optimization
+## Phase 7 — Adaptive optimization ✅
 
-- ✅ `nexusnet-optimizer`: bandwidth and round-trip-time estimation with
-  adaptive payload sizing, compression level, and retry timing. Congestion
-  prediction and predictive scheduling remain.
+- ✅ `nexusnet-optimizer`: bandwidth, latency, and loss estimation; network
+  quality grading; adaptive payload sizing, compression, caching, and delta
+  sync; congestion predicted from latency inflation with an AIMD window; and
+  trend-based predictive scheduling.
 
 ## Phase 8 — Extensibility & SDKs
 

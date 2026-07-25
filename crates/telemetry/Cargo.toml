@@ -1,6 +1,6 @@
 [package]
 name = "nexusnet-telemetry"
-description = "Telemetry export and observability plumbing for NexusNet."
+description = "Metrics collection and export for the NexusNet networking framework."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,3 +16,11 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+nexusnet-analytics = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

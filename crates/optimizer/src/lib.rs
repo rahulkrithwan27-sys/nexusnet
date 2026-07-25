@@ -16,6 +16,10 @@
 //!   [`OptimizationMetrics`] reporting what it saw.
 //! * [`CompressionStrategy`], [`CacheStrategy`], and [`DeltaSyncStrategy`] —
 //!   the individual decisions, usable on their own.
+//! * [`CongestionDetector`] and [`CongestionWindow`] — congestion predicted
+//!   from latency inflation, and the window that responds to it.
+//! * [`TrendPredictor`] and [`advise_send`] — where conditions are heading, and
+//!   what to do about it.
 //! * [`Optimizer`] — the narrower predecessor of [`NetworkOptimizer`],
 //!   producing a [`Recommendation`] from bandwidth and latency alone. Retained
 //!   for callers that do not measure loss.
@@ -44,6 +48,31 @@
 //! assert!(plan.cache.capacity_bytes > 0);
 //! ```
 //!
+//! ## Predicting congestion, not reacting to it
+//!
+//! Loss-based congestion control waits for a packet to be dropped, by which
+//! point the bottleneck queue is already full and every packet behind it has
+//! been delayed. Queues fill before they overflow, and a filling queue shows up
+//! as latency rising above the path's minimum — so
+//! [`CongestionDetector`] reports [`CongestionSignal::Queueing`] while there is
+//! still time to slow down.
+//!
+//! ```
+//! use std::time::Duration;
+//! use nexusnet_optimizer::{CongestionDetector, CongestionSignal};
+//!
+//! let mut detector = CongestionDetector::new();
+//! for _ in 0..20 {
+//!     detector.observe(Duration::from_millis(20));
+//! }
+//! for _ in 0..30 {
+//!     detector.observe(Duration::from_millis(100));
+//! }
+//!
+//! assert_eq!(detector.signal(), CongestionSignal::Queueing);
+//! assert_eq!(detector.loss_events(), 0, "detected before anything was dropped");
+//! ```
+//!
 //! ## Grading the link
 //!
 //! [`NetworkQuality`] grades bandwidth, latency, and loss separately and reports
@@ -62,8 +91,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod advisor;
+mod congestion;
 mod estimate;
 mod network;
+mod predict;
 mod quality;
 mod strategy;
 
@@ -71,11 +102,19 @@ pub use crate::advisor::{
     CompressionAdvice, Optimizer, Recommendation, DEFAULT_PAYLOAD, FAST_LINK_BYTES_PER_SECOND,
     MAX_PAYLOAD, MIN_PAYLOAD, SLOW_LINK_BYTES_PER_SECOND,
 };
+pub use crate::congestion::{
+    CongestionDetector, CongestionSignal, CongestionState, CongestionWindow,
+    DEFAULT_QUEUEING_THRESHOLD, DEFAULT_SEGMENT,
+};
 pub use crate::estimate::{
     BandwidthEstimator, RttEstimator, DEFAULT_SMOOTHING, MAX_RETRANSMIT_TIMEOUT,
     MIN_RETRANSMIT_TIMEOUT,
 };
 pub use crate::network::{NetworkOptimizer, OptimizationMetrics, OptimizationPlan};
+pub use crate::predict::{
+    advise_send, advise_send_under_congestion, Forecast, SendAdvice, Trend, TrendPredictor,
+    DEFAULT_HORIZON, DEFAULT_WINDOW,
+};
 pub use crate::quality::{LossEstimator, NetworkQuality};
 pub use crate::strategy::{
     CacheStrategy, CompressionStrategy, DeltaSyncStrategy, MIN_COMPRESSIBLE, MIN_DELTA_PAYLOAD,

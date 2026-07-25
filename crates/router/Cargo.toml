@@ -1,6 +1,6 @@
 [package]
 name = "nexusnet-router"
-description = "Routing, path selection, and load balancing for NexusNet."
+description = "Routing, load balancing, and health-aware failover for the NexusNet networking framework."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,3 +16,10 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -190,6 +190,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     returns the sooner of the shaping and retry deadlines.
   - 98 tests in the crate, up from 38.
 
+- **Phase 6: observability and routing.**
+  - `nexusnet-analytics`: `Histogram` records distributions in 64 fixed
+    logarithmic buckets, so memory is constant regardless of runtime, with
+    percentiles, exact min/max/mean, merging, and heavy-tail detection.
+    `RateMeter` reports smoothed and lifetime throughput; `ConnectionStats`
+    tracks bytes, frames, errors, loss, latency, and jitter derived from
+    consecutive round-trip measurements.
+  - `nexusnet-router`: `Router` selects endpoints by round robin, weighted round
+    robin, or least connections (normalized by weight), withdrawing endpoints
+    that fail repeatedly. `HealthTracker` implements a circuit breaker where a
+    withdrawn endpoint is restored only after a cooldown and a successful probe,
+    and a failed probe restarts the cooldown. `select` returns `None` on total
+    exhaustion rather than routing to a known-dead backend.
+  - `nexusnet-telemetry`: `MetricsRegistry` holds counters, gauges, and
+    histograms in stable name order, with Prometheus text and JSON exporters
+    that escape their output and perform no I/O.
+  - 97 further tests across the three crates.
+
+- **Phase 7 completion: congestion prediction and predictive scheduling.**
+  - `CongestionDetector` infers congestion from round-trip time rising above the
+    path minimum, reporting `Queueing` before any packet is dropped; loss
+    remains handled as an unambiguous fallback. `queueing_delay` reports the
+    latency recoverable by slowing down.
+  - `CongestionWindow` applies additive increase and multiplicative decrease
+    with slow start, cautious recovery, and a timeout path that collapses the
+    window; it never reaches zero, which would stall a connection permanently.
+  - `TrendPredictor` fits a least-squares line over a bounded sample window and
+    reports direction, extrapolated value, and a coefficient-of-determination
+    confidence, so a trend drawn through noise is not acted on.
+  - `advise_send` turns a forecast into scheduling advice: degrading conditions
+    move work earlier, improving conditions defer bulk work, urgent work is
+    never deferred, and observed congestion overrides the forecast.
+  - 46 further tests in the crate.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

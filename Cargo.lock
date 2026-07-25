@@ -416,6 +416,9 @@ dependencies = [
 [[package]]
 name = "nexusnet-analytics"
 version = "0.1.0"
+dependencies = [
+ "criterion",
+]
 
 [[package]]
 name = "nexusnet-cache"
@@ -483,6 +486,9 @@ dependencies = [
 [[package]]
 name = "nexusnet-router"
 version = "0.1.0"
+dependencies = [
+ "criterion",
+]
 
 [[package]]
 name = "nexusnet-scheduler"
@@ -507,6 +513,10 @@ dependencies = [
 [[package]]
 name = "nexusnet-telemetry"
 version = "0.1.0"
+dependencies = [
+ "criterion",
+ "nexusnet-analytics",
+]
 
 [[package]]
 name = "nexusnet-transport"

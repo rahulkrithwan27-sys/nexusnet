@@ -1,6 +1,6 @@
 [package]
 name = "nexusnet-analytics"
-description = "Runtime analytics and connection statistics for NexusNet."
+description = "Network measurement and statistics for the NexusNet networking framework."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,3 +16,10 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
