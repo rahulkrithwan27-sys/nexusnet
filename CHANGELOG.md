@@ -253,6 +253,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reports every occurrence rather than stopping at the first. Wired into CI
   alongside `cargo clippy`, not instead of it.
 
+- **`nexusnet-plugin-api` (Phase 8).** Extension points for third-party code.
+  - `Plugin` provides the lifecycle trait; `PluginRegistry` registers, loads,
+    and unloads, isolating failures so one misconfigured plugin cannot prevent
+    the others from loading, and removing a plugin even when its own cleanup
+    fails.
+  - `ApiVersion` refuses plugins built against an incompatible API: majors must
+    match and a plugin may target an older minor but never a newer one, since a
+    newer one may use extension points this host lacks.
+  - `Interceptor` and `InterceptorChain` provide the data-path extension point,
+    running in priority order outbound and reverse order inbound so transforming
+    pairs unwind correctly; an interceptor may also drop a payload, and errors
+    name the interceptor responsible.
+  - Runtime loading of shared libraries is deliberately not supported and the
+    reasoning is documented: Rust has no stable ABI, so the API version check
+    cannot protect against an ABI mismatch.
+  - 35 tests including a three-deep nested transform asserting a lossless round
+    trip.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

@@ -72,7 +72,9 @@ request that makes it.
 
 ## Phase 8 — Extensibility & SDKs
 
-- `nexusnet-plugin-api`: stable extension traits, registration, and discovery.
+- ✅ `nexusnet-plugin-api`: plugin lifecycle traits, an ordered interceptor
+  chain for the data path, a registry with failure isolation, and API version
+  compatibility checking.
 - SDKs under `sdk/`: Python (via `PyO3`/FFI), C++ (via a C ABI), and Flutter;
   plus a REST API surface.
 - `dashboard/`: web dashboard backend and frontend.

@@ -473,6 +473,9 @@ dependencies = [
 [[package]]
 name = "nexusnet-plugin-api"
 version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "nexusnet-protocol"

@@ -1,6 +1,6 @@
 [package]
 name = "nexusnet-plugin-api"
-description = "Stable extension traits and registration for NexusNet plugins."
+description = "Stable extension traits and plugin registration for the NexusNet networking framework."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,3 +16,8 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+thiserror = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
