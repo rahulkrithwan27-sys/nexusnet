@@ -51,6 +51,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 24 tests passing across all five feature combinations, plus Criterion
     benchmarks reporting ratio alongside throughput.
 
+- **`nexusnet-transport` (Phase 3).** TCP and UDP transports over Tokio.
+  - `Connection<S>`, a framed connection generic over any async stream, pairing
+    the protocol codec with real I/O; `send`, `send_all` for batched writes,
+    `recv`, and `shutdown`.
+  - `TcpListener` and `tcp::connect`, the latter bounded by a configurable
+    connect timeout; `TcpStream` nodelay is enabled by default since framed
+    protocols gain nothing from Nagle's algorithm.
+  - `UdpEndpoint` carrying one frame per datagram, rejecting oversized
+    datagrams rather than silently truncating them.
+  - `TransportConfig` for payload limits, read buffer size, datagram limits,
+    connect timeout, and socket options.
+  - A clean close at a frame boundary reports end-of-stream; a close mid-frame
+    is `UnexpectedEof`, so truncation is never mistaken for a normal close.
+    `Error::is_fatal` distinguishes connection-invalidating errors.
+  - 25 tests: framing over in-memory pipes and over real loopback sockets,
+    including 500 variable-length frames arriving in order, concurrent clients,
+    payload-limit enforcement, connect timeout, and malformed datagrams.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

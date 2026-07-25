@@ -25,10 +25,14 @@ request that makes it.
   small and incompressible payloads, and decompression enforces an output limit
   to reject decompression bombs.
 
-## Phase 3 — Transport
+## Phase 3 — Transport 🚧
 
-- `nexusnet-transport`: TCP and UDP first, then QUIC, WebSocket, HTTP/2, and
-  HTTP/3; connection pooling, automatic reconnect, and multiplexing.
+- ✅ `nexusnet-transport`: TCP and UDP, with a `Connection` type generic over
+  any async stream so TLS and QUIC attach to the same framing logic. Bounded
+  connect timeouts, configurable payload and datagram limits, and clean-close
+  versus truncation distinguished.
+- QUIC, WebSocket, HTTP/2, and HTTP/3 transports.
+- Connection pooling, automatic reconnect, and stream multiplexing.
 - Async runtime integration wired into the core engine lifecycle.
 
 ## Phase 4 — Security

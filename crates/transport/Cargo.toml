@@ -1,6 +1,6 @@
 [package]
 name = "nexusnet-transport"
-description = "Transport-layer connectivity for NexusNet: TCP, UDP, QUIC, WebSocket, HTTP/2 and HTTP/3."
+description = "Transport-layer connectivity (TCP, UDP) for the NexusNet networking framework."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,3 +16,16 @@ categories.workspace = true
 workspace = true
 
 [dependencies]
+nexusnet-protocol = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-util", "time", "sync"] }
+criterion = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
