@@ -69,6 +69,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     including 500 variable-length frames arriving in order, concurrent clients,
     payload-limit enforcement, connect timeout, and malformed datagrams.
 
+- **Connection pooling and reconnection (Phase 3).**
+  - `ConnectionPool` reuses connections to a peer, bounded by an idle-connection
+    limit and an idle-time window; connections idle past that window are
+    discarded rather than handed out, since peers and middleboxes drop idle
+    connections silently.
+  - `PooledConnection` returns itself to the pool on drop, but detects fatal
+    errors and clean peer closes automatically and drops those connections
+    instead, so a desynchronized stream is never handed to another caller.
+  - `PoolStats` reports connections created, reused, discarded, and expired,
+    plus a reuse ratio.
+  - `ReconnectPolicy` and `connect_with_retry` implement exponential backoff
+    with equal jitter, capped delays, and optional attempt limits; jitter
+    decorrelates clients so a recovering service is not hammered in lockstep.
+    Only connection establishment is retried, never a mid-session failure.
+  - 22 further tests covering reuse, capacity, expiry, broken-connection
+    rejection, backoff bounds, jitter distribution, and recovery once a server
+    becomes reachable.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

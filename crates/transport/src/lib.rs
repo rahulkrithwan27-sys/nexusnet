@@ -14,6 +14,9 @@
 //!   today; TLS and QUIC attach to the same type later.
 //! * [`TcpListener`] and [`tcp::connect`] — the stream transport.
 //! * [`UdpEndpoint`] — a datagram transport, one frame per datagram.
+//! * [`ConnectionPool`] — reusable connections with idle expiry and automatic
+//!   removal of connections left desynchronized by a failure.
+//! * [`ReconnectPolicy`] — exponential backoff with jitter for dialing.
 //! * [`TransportConfig`] — payload limits, buffer sizes, timeouts, and socket
 //!   options.
 //!
@@ -60,6 +63,8 @@
 
 mod config;
 mod connection;
+mod pool;
+mod reconnect;
 pub mod tcp;
 mod udp;
 
@@ -68,5 +73,12 @@ pub use crate::config::{
     DEFAULT_READ_BUFFER,
 };
 pub use crate::connection::Connection;
+pub use crate::pool::{
+    ConnectionPool, PoolConfig, PoolStats, PooledConnection, DEFAULT_MAX_IDLE, DEFAULT_POOL_SIZE,
+};
+pub use crate::reconnect::{
+    connect_with_retry, is_retryable, ReconnectPolicy, DEFAULT_INITIAL_DELAY, DEFAULT_MAX_DELAY,
+    DEFAULT_MULTIPLIER,
+};
 pub use crate::tcp::{TcpConnection, TcpListener};
 pub use crate::udp::UdpEndpoint;

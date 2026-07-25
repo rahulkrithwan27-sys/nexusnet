@@ -31,8 +31,10 @@ request that makes it.
   any async stream so TLS and QUIC attach to the same framing logic. Bounded
   connect timeouts, configurable payload and datagram limits, and clean-close
   versus truncation distinguished.
+- ✅ Connection pooling with idle expiry and broken-connection detection, and
+  reconnection with exponentially backed-off, jittered retries.
 - QUIC, WebSocket, HTTP/2, and HTTP/3 transports.
-- Connection pooling, automatic reconnect, and stream multiplexing.
+- Stream multiplexing.
 - Async runtime integration wired into the core engine lifecycle.
 
 ## Phase 4 — Security
