@@ -152,13 +152,18 @@ a clonable handle plus a driver. Only the driver touches the socket — it route
 inbound frames to the right stream and serializes outbound frames from every
 stream — so there is no locking on the hot path.
 
-### Flow control: a known limitation
+### Flow control
 
-Per-stream inbound channels are bounded, which bounds memory. But a consumer
-that stops reading will eventually stall the driver, and that stalls **every**
-stream — classic head-of-line blocking. Proper per-stream flow control (a credit
-window, as HTTP/2 and QUIC use) belongs with the scheduler work in a later
-phase. Until then, consume promptly or raise `SessionConfig::stream_buffer`.
+Streams carry per-stream credit windows, as HTTP/2 and QUIC do. A sender may
+have at most `SessionConfig::initial_window` bytes outstanding per stream;
+credit returns as the consumer reads, via `Control` frames carrying a 4-byte
+increment on the stream's identifier.
+
+The property this buys — and the one the tests assert directly — is that **a
+stalled consumer blocks only its own stream**. Its sender waits in
+`Stream::send`; every other stream keeps flowing. A peer that overruns its
+window commits a protocol violation and the session is torn down, and a payload
+larger than the whole window is rejected immediately rather than deadlocking.
 
 ## Serving
 

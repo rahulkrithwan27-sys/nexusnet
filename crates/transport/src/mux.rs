@@ -23,12 +23,19 @@
 //!
 //! ## Flow control
 //!
-//! Per-stream inbound channels are bounded, which bounds memory. A consumer
-//! that stops reading will therefore eventually stall the driver, which stalls
-//! *all* streams — classic head-of-line blocking. Real per-stream flow control
-//! (a credit window, as HTTP/2 and QUIC use) belongs with the scheduler work in
-//! a later phase; until then, consume promptly or raise
-//! [`SessionConfig::stream_buffer`].
+//! Streams carry per-stream credit windows, as HTTP/2 and QUIC do. A sender may
+//! have at most a window's worth of bytes outstanding on each stream; the
+//! receiver returns credit as the application consumes, via `Control` frames
+//! carrying a 4-byte big-endian increment on the stream's identifier.
+//!
+//! The consequence is the property that matters: **a stalled consumer exhausts
+//! only its own stream's window**. Its sender blocks in
+//! [`Stream::send`]; every other stream keeps flowing. Without this, one slow
+//! reader would eventually stall the shared driver and with it the whole
+//! session — classic head-of-line blocking.
+//!
+//! A peer that overruns its window commits a protocol violation and the session
+//! is torn down; a correct peer tracks its own window and stops.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -36,8 +43,9 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use bytes::Bytes;
 use nexusnet_protocol::{Frame, FrameFlags, FrameType};
+use nexusnet_scheduler::FlowController;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Notify};
 
 use crate::config::{Error, Result};
 use crate::connection::{Connection, ConnectionReader, ConnectionWriter};
@@ -111,6 +119,11 @@ pub struct SessionConfig {
     pub max_streams: usize,
     /// Whether to answer inbound pings automatically.
     pub auto_pong: bool,
+    /// The per-stream flow-control window, in bytes.
+    ///
+    /// A sender may have at most this many bytes outstanding on one stream. A
+    /// single payload larger than this can never be sent whole and is rejected.
+    pub initial_window: u32,
 }
 
 impl SessionConfig {
@@ -122,7 +135,21 @@ impl SessionConfig {
             outbound_buffer: DEFAULT_OUTBOUND_BUFFER,
             max_streams: DEFAULT_MAX_STREAMS,
             auto_pong: true,
+            initial_window: nexusnet_scheduler::DEFAULT_WINDOW,
         }
+    }
+
+    /// Sets the per-stream flow-control window.
+    ///
+    /// Zero is raised to one; a zero window could never send anything.
+    #[must_use]
+    pub const fn with_initial_window(mut self, initial_window: u32) -> Self {
+        self.initial_window = if initial_window == 0 {
+            1
+        } else {
+            initial_window
+        };
+        self
     }
 
     /// Sets the per-stream inbound buffer.
@@ -195,7 +222,19 @@ struct Shared {
     streams_accepted: AtomicU64,
     streams_closed: AtomicU64,
     frames_dropped: AtomicU64,
-    shutdown: tokio::sync::Notify,
+    shutdown: Notify,
+    /// Per-stream credit windows; the mechanism that keeps one stalled stream
+    /// from blocking the rest.
+    flow: Mutex<FlowController>,
+    /// Woken whenever the peer returns window credit, so blocked senders
+    /// recheck.
+    window_notify: Notify,
+}
+
+impl Shared {
+    fn lock_flow(&self) -> std::sync::MutexGuard<'_, FlowController> {
+        self.flow.lock().unwrap_or_else(PoisonError::into_inner)
+    }
 }
 
 impl Shared {
@@ -214,6 +253,9 @@ impl Shared {
         if self.lock_streams().remove(&stream_id).is_some() {
             self.streams_closed.fetch_add(1, Ordering::Relaxed);
         }
+        self.lock_flow().close(stream_id);
+        // A sender blocked on this stream's window must observe the closure.
+        self.window_notify.notify_waiters();
     }
 }
 
@@ -289,7 +331,9 @@ impl Session {
             streams_accepted: AtomicU64::new(0),
             streams_closed: AtomicU64::new(0),
             frames_dropped: AtomicU64::new(0),
-            shutdown: tokio::sync::Notify::new(),
+            shutdown: Notify::new(),
+            flow: Mutex::new(FlowController::new(config.initial_window)),
+            window_notify: Notify::new(),
         });
 
         let (outbound_tx, outbound_rx) = mpsc::channel(config.outbound_buffer);
@@ -365,6 +409,8 @@ impl SessionHandle {
             streams.insert(stream_id, tx);
             stream_id
         };
+
+        self.shared.lock_flow().open(stream_id);
 
         self.shared.streams_opened.fetch_add(1, Ordering::Relaxed);
 
@@ -483,7 +529,22 @@ where
                 }
                 return Ok(());
             }
-            FrameType::Pong | FrameType::Handshake | FrameType::Control => return Ok(()),
+            FrameType::Control => {
+                // A control frame on a stream identifier is a window update:
+                // a 4-byte big-endian credit increment.
+                if stream_id != CONTROL_STREAM_ID {
+                    if let Ok(bytes) = <[u8; 4]>::try_from(frame.payload().as_ref()) {
+                        let increment = u32::from_be_bytes(bytes);
+                        self.shared
+                            .lock_flow()
+                            .grant(stream_id, increment)
+                            .map_err(|source| Error::FlowViolation { stream_id, source })?;
+                        self.shared.window_notify.notify_waiters();
+                    }
+                }
+                return Ok(());
+            }
+            FrameType::Pong | FrameType::Handshake => return Ok(()),
             FrameType::Close => {
                 self.shared.close_stream(stream_id);
                 return Ok(());
@@ -513,6 +574,12 @@ where
                 return Ok(());
             }
         }
+
+        let payload_len = u32::try_from(frame.payload().len()).unwrap_or(u32::MAX);
+        self.shared
+            .lock_flow()
+            .receive(stream_id, payload_len)
+            .map_err(|source| Error::FlowViolation { stream_id, source })?;
 
         let sender = self.shared.lock_streams().get(&stream_id).cloned();
         if let Some(sender) = sender {
@@ -545,6 +612,7 @@ where
             streams.insert(stream_id, tx);
         }
 
+        self.shared.lock_flow().open(stream_id);
         self.shared.streams_accepted.fetch_add(1, Ordering::Relaxed);
 
         let stream = Stream {
@@ -599,6 +667,9 @@ impl Stream {
             return Err(Error::StreamClosed { stream_id: self.id });
         }
 
+        let len = u32::try_from(payload.len()).unwrap_or(u32::MAX);
+        self.reserve_window(len).await?;
+
         let frame = Frame::new(FrameType::Data, self.id, payload)?;
         self.outbound
             .send(frame)
@@ -606,9 +677,65 @@ impl Stream {
             .map_err(|_| Error::SessionClosed)
     }
 
+    /// Waits until this stream's window can cover `len` bytes, then charges it.
+    ///
+    /// Frames are atomic, so credit is taken all-or-nothing: a partial grant
+    /// would mean sending part of a payload, which the protocol cannot express.
+    async fn reserve_window(&self, len: u32) -> Result<()> {
+        let window = self.shared.config.initial_window;
+        if len > window {
+            // No amount of waiting makes an oversized payload fit; failing now
+            // beats deadlocking forever.
+            return Err(Error::PayloadExceedsWindow {
+                len: len as usize,
+                window,
+            });
+        }
+
+        loop {
+            // Register interest *before* checking, so a grant arriving between
+            // the check and the await cannot be missed.
+            let notified = self.shared.window_notify.notified();
+
+            {
+                let mut flow = self.shared.lock_flow();
+                if flow.send_available(self.id) >= len {
+                    let granted = flow.reserve(self.id, len);
+                    debug_assert_eq!(granted, len, "availability was just checked");
+                    return Ok(());
+                }
+            }
+
+            if self.outbound.is_closed() {
+                return Err(Error::SessionClosed);
+            }
+
+            notified.await;
+        }
+    }
+
     /// Receives the next payload, or `None` once the stream ends.
     pub async fn recv(&mut self) -> Option<Bytes> {
-        self.inbound.recv().await
+        let payload = self.inbound.recv().await?;
+
+        // Consuming frees window space; past the threshold, tell the peer so
+        // its sender can proceed. This is what re-opens a blocked stream.
+        let len = u32::try_from(payload.len()).unwrap_or(u32::MAX);
+        let increment = self.shared.lock_flow().consume(self.id, len);
+
+        if let Some(increment) = increment {
+            let update = Frame::new(
+                FrameType::Control,
+                self.id,
+                Bytes::copy_from_slice(&increment.to_be_bytes()),
+            )
+            .ok()?;
+            // A closed session means no peer to update; the payload is still
+            // valid, so deliver it regardless.
+            let _ = self.outbound.send(update).await;
+        }
+
+        Some(payload)
     }
 
     /// Closes the stream, signalling end-of-stream to the peer.

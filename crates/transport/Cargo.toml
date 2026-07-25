@@ -18,6 +18,7 @@ workspace = true
 [dependencies]
 nexusnet-core = { workspace = true }
 nexusnet-protocol = { workspace = true }
+nexusnet-scheduler = { workspace = true }
 bytes = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

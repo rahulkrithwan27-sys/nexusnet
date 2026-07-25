@@ -325,3 +325,148 @@ async fn closing_the_session_stops_the_driver() {
         "a closed session should not accept new traffic silently"
     );
 }
+
+// --- Flow-control behavior -------------------------------------------------
+
+#[tokio::test]
+async fn a_sender_blocks_when_the_window_is_exhausted() {
+    let config = SessionConfig::default().with_initial_window(1000);
+    let (client, server) = session_pair(config);
+
+    let mut outbound = client.open_stream().expect("opens");
+
+    // Fill the window exactly; this must succeed.
+    outbound
+        .send(Bytes::from(vec![b'a'; 1000]))
+        .await
+        .expect("fits the window");
+
+    // The next byte exceeds outstanding credit: send must block, not proceed.
+    let blocked = tokio::time::timeout(
+        Duration::from_millis(200),
+        outbound.send(Bytes::from_static(b"b")),
+    )
+    .await;
+    assert!(
+        blocked.is_err(),
+        "sending past the window must wait for credit, not silently proceed"
+    );
+
+    // The consumer reads, which returns credit and unblocks the sender.
+    let mut inbound = server.accept_stream().await.expect("a stream arrives");
+    assert_eq!(inbound.recv().await.expect("payload").len(), 1000);
+
+    let unblocked = tokio::time::timeout(
+        Duration::from_secs(2),
+        outbound.send(Bytes::from_static(b"b")),
+    )
+    .await;
+    assert!(
+        unblocked.is_ok(),
+        "consuming must return credit and release the sender"
+    );
+}
+
+#[tokio::test]
+async fn a_stalled_stream_does_not_block_the_others() {
+    // The head-of-line test: this is the property flow control exists for.
+    let config = SessionConfig::default().with_initial_window(2000);
+    let (client, server) = session_pair(config);
+
+    let mut stalled_tx = client.open_stream().expect("opens");
+    let mut live_tx = client.open_stream().expect("opens");
+
+    // Exhaust the stalled stream's window; its consumer never reads.
+    stalled_tx
+        .send(Bytes::from(vec![b's'; 2000]))
+        .await
+        .expect("fits the window");
+    let _stalled_rx = server.accept_stream().await.expect("a stream arrives");
+
+    // The stalled sender is now blocked.
+    let blocked = tokio::time::timeout(
+        Duration::from_millis(100),
+        stalled_tx.send(Bytes::from_static(b"more")),
+    )
+    .await;
+    assert!(blocked.is_err(), "the stalled stream is out of credit");
+
+    // The other stream must keep flowing in both directions, repeatedly.
+    // A stream materializes on the peer only when its first frame arrives, so
+    // send once before accepting it.
+    live_tx
+        .send(Bytes::from(vec![0_u8; 512]))
+        .await
+        .expect("the live stream is not blocked by its neighbour");
+    let mut live_rx = server.accept_stream().await.expect("a stream arrives");
+
+    for round in 0..10_u8 {
+        let echoed = tokio::time::timeout(Duration::from_secs(2), live_rx.recv())
+            .await
+            .expect("delivery is prompt")
+            .expect("a payload arrives");
+        assert_eq!(echoed, Bytes::from(vec![round; 512]));
+
+        if round < 9 {
+            let next = Bytes::from(vec![round + 1; 512]);
+            tokio::time::timeout(Duration::from_secs(2), live_tx.send(next))
+                .await
+                .expect("the live stream must not be blocked by its neighbour")
+                .expect("sends");
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_payload_larger_than_the_window_is_rejected_not_deadlocked() {
+    let config = SessionConfig::default().with_initial_window(1000);
+    let (client, _server) = session_pair(config);
+
+    let mut stream = client.open_stream().expect("opens");
+    let result = tokio::time::timeout(
+        Duration::from_secs(2),
+        stream.send(Bytes::from(vec![b'x'; 5000])),
+    )
+    .await
+    .expect("resolves immediately rather than waiting forever");
+
+    assert!(
+        matches!(
+            result,
+            Err(Error::PayloadExceedsWindow {
+                len: 5000,
+                window: 1000
+            })
+        ),
+        "no amount of waiting fits 5000 bytes into a 1000-byte window, got {result:?}"
+    );
+}
+
+#[tokio::test]
+async fn sustained_transfer_works_through_a_small_window() {
+    // Far more data than the window: correctness depends on the credit loop.
+    let config = SessionConfig::default().with_initial_window(4096);
+    let (client, server) = session_pair(config);
+
+    let mut tx = client.open_stream().expect("opens");
+
+    let sender = tokio::spawn(async move {
+        for round in 0..64_u8 {
+            tx.send(Bytes::from(vec![round; 1024]))
+                .await
+                .expect("sends");
+        }
+    });
+
+    let mut rx = server.accept_stream().await.expect("a stream arrives");
+    for round in 0..64_u8 {
+        let payload = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+            .await
+            .expect("the credit loop keeps data moving")
+            .expect("a payload arrives");
+        assert_eq!(payload[0], round, "payloads arrive in order");
+        assert_eq!(payload.len(), 1024);
+    }
+
+    sender.await.expect("the sender completes");
+}

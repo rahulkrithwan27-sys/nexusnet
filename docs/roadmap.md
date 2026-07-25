@@ -38,7 +38,7 @@ request that makes it.
 - ✅ Async runtime integration: `Server` binds listeners to the engine
   lifecycle, with a connection cap and bounded graceful shutdown.
 - QUIC, WebSocket, HTTP/2, and HTTP/3 transports.
-- ✅ Per-stream flow control (credit windows) implemented in `nexusnet-scheduler`; wiring it into the multiplexer remains.
+- ✅ Per-stream flow control (credit windows) implemented in `nexusnet-scheduler` and wired into the multiplexer; head-of-line blocking is resolved and tested.
 
 ## Phase 4 — Security
 

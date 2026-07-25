@@ -21,6 +21,10 @@ thiserror = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 
+[[bench]]
+name = "scheduler_bench"
+harness = false
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

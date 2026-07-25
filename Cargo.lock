@@ -526,6 +526,7 @@ dependencies = [
  "criterion",
  "nexusnet-core",
  "nexusnet-protocol",
+ "nexusnet-scheduler",
  "thiserror",
  "tokio",
  "tracing",

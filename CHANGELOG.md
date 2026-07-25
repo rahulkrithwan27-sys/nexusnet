@@ -224,6 +224,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     never deferred, and observed congestion overrides the forecast.
   - 46 further tests in the crate.
 
+- **Flow control wired into the multiplexer.** `Session` now enforces
+  per-stream credit windows: `Stream::send` waits when its window is exhausted,
+  `Stream::recv` returns credit to the peer via `Control` frames, and a stalled
+  consumer blocks only its own stream — the previously documented head-of-line
+  limitation is resolved and covered by four tests, including a sustained
+  64-payload transfer through a 4 KiB window. A window overrun by the peer is a
+  protocol violation that tears the session down; a payload larger than the
+  window is rejected immediately rather than deadlocking.
+- **Integration tests and benchmarks for `nexusnet-scheduler` and
+  `nexusnet-optimizer`.** Six scheduler scenarios drive the full pipeline over
+  simulated time (clean link, deterministic heavy loss, dead destination,
+  end-to-end rate bounding, fairness under load with retries interleaved, and a
+  reservation surviving a bulk flood); five optimizer scenarios follow one link
+  through healthy, queueing, degraded, and recovered states asserting every
+  component agrees. Criterion benchmarks cover both crates' hot paths — all
+  under 120 ns per operation.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

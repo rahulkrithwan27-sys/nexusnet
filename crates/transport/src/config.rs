@@ -57,6 +57,29 @@ pub enum Error {
     #[error("the session has closed")]
     SessionClosed,
 
+    /// The peer violated per-stream flow control.
+    ///
+    /// A correct peer tracks its own window and stops; overrunning it is a
+    /// protocol violation, not congestion, so the session is torn down.
+    #[error("flow-control violation on stream {stream_id}: {source}")]
+    FlowViolation {
+        /// The stream on which the violation occurred.
+        stream_id: u32,
+        /// The underlying accounting error.
+        #[source]
+        source: nexusnet_scheduler::FlowError,
+    },
+
+    /// A payload exceeds the stream's flow-control window and can never be
+    /// sent whole.
+    #[error("payload of {len} bytes exceeds the {window}-byte stream window")]
+    PayloadExceedsWindow {
+        /// The offered payload length.
+        len: usize,
+        /// The window size in force.
+        window: u32,
+    },
+
     /// The stream was closed locally and cannot be written to.
     #[error("stream {stream_id} is closed")]
     StreamClosed {
