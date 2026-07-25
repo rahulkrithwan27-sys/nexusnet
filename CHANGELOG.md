@@ -172,6 +172,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     NexusNet crate, keeping policy separable from mechanism.
   - 61 further tests across both crates.
 
+- **`nexusnet-scheduler` completion (Phase 5).**
+  - `PacketScheduler` unifies priority queueing, traffic shaping, and retry
+    management behind a single `poll_at` call; it performs no I/O and takes its
+    clock from the caller, so all timing behaviour is deterministically tested.
+  - `TrafficShaper` adds an aggregate rate with optional per-class reservations,
+    so bulk traffic cannot consume the budget a heartbeat needs; admission is
+    all-or-nothing so refusals never deduct credit.
+  - `RetryManager` and `RetryPolicy` schedule retransmissions with backed-off,
+    jittered delays, held in a due-time heap so release is O(log n) and ties
+    break by scheduling order.
+  - `SchedulerMetrics` reports an immutable snapshot: packet and byte counters
+    split between first sends and retransmissions, shaping delay, and pending,
+    in-flight, and awaiting-retry depths.
+  - A packet deferred by the rate limiter keeps its place; a packet larger than
+    the burst capacity is dropped rather than blocking the queue; and `Wait`
+    returns the sooner of the shaping and retry deadlines.
+  - 98 tests in the crate, up from 38.
+
 ### Changed
 
 - Toolchain pin moved from `1.83.0` to `1.97.1` and `rust-src` added to the

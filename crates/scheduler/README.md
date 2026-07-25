@@ -5,10 +5,116 @@ order.
 
 ## What's here
 
+- **`PacketScheduler`** — the entry point, tying the rest together.
 - **`PriorityQueue`** — weighted fair queueing across five priority classes.
-- **`TokenBucket`** — rate limiting and shaping with a burst allowance.
+- **`TokenBucket`** — rate limiting with a burst allowance.
+- **`TrafficShaper`** — an aggregate send rate with optional per-class
+  reservations.
+- **`RetryManager`** — retransmission scheduling with backed-off, jittered
+  delays.
 - **`FlowController`** — per-stream credit windows, which remove head-of-line
   blocking from a multiplexed session.
+- **`SchedulerMetrics`** — a consistent snapshot of what the scheduler did.
+
+## The packet scheduler
+
+`PacketScheduler` owns the queue, the shaper, and the retry manager, and drives
+them from a single `poll_at` call. A caller loops: poll, send what comes back,
+report the outcome.
+
+```rust
+use std::time::Instant;
+use nexusnet_scheduler::{Dispatch, PacketScheduler, Priority, SchedulerConfig};
+
+let now = Instant::now();
+let mut scheduler: PacketScheduler<&str> =
+    PacketScheduler::new_at(SchedulerConfig::new().with_rate(1_000_000.0), now);
+
+scheduler.enqueue(Priority::Background, 512, "bulk upload")?;
+scheduler.enqueue(Priority::Critical, 64, "keepalive")?;
+
+match scheduler.poll_at(now) {
+    Dispatch::Send(packet) => {
+        assert_eq!(*packet.payload(), "keepalive");   // urgent traffic first
+        scheduler.acknowledge(packet.id());
+    }
+    Dispatch::Wait { delay } => { /* sleep for `delay`, then poll again */ }
+    Dispatch::Idle => { /* nothing to do */ }
+    _ => {}
+}
+# Ok::<(), nexusnet_scheduler::EnqueueError>(())
+```
+
+### No I/O, and an explicit clock
+
+The scheduler sends nothing and owns no timer. It's a state machine driven by an
+`Instant` the caller supplies, so rate limiting, backoff, and priority behaviour
+under load are all tested deterministically rather than by sleeping and hoping.
+The same type works from a Tokio task, a plain thread, or a simulation.
+
+### Design decisions worth knowing
+
+**A deferred packet keeps its place.** When the rate limiter holds a packet
+back, it's parked on the scheduler rather than pushed back into the queue. It's
+reconsidered first on the next poll, so a rate-limited packet can't lose its
+place to traffic that arrives while it waits.
+
+**An unsendable packet is dropped, not retried forever.** A payload larger than
+the whole burst capacity can never be admitted — no amount of waiting helps — so
+it's dropped and counted rather than left blocking everything behind it.
+
+**`Wait` accounts for both deadlines.** The delay returned is the sooner of the
+rate limit clearing and the next retry falling due, so sleeping on it wastes no
+time and misses nothing.
+
+**Retries re-enter the queue.** A retransmission competes fairly with fresh
+traffic in its class rather than jumping ahead, which keeps one failing stream
+from monopolising the link.
+
+**Identifiers are never reused,** and a rejected enqueue doesn't consume one, so
+gaps in the sequence always mean something real.
+
+## Retry management
+
+`RetryPolicy` applies exponential backoff with jitter; `RetryManager` holds
+pending retries in a due-time-ordered heap, so releasing them is `O(log n)`
+rather than a scan. Ties break by scheduling order, so a burst of failures
+retries in the sequence it failed.
+
+Jitter matters as much as the backoff: clients retrying on a fixed interval
+synchronise and hammer a service exactly as it tries to recover. Delays are
+uniform in `[d/2, d]`.
+
+## Traffic shaping
+
+`TrafficShaper` layers two limits over the token bucket: an aggregate cap, and
+an optional reservation per priority class.
+
+The reservation is the point. An aggregate limit alone is first-come,
+first-served, so a large background upload can consume the entire budget and
+leave a heartbeat queued behind it. A reserved class draws on its own bucket
+first and only then competes for the shared one.
+
+```rust
+use nexusnet_scheduler::{Priority, TrafficShaper};
+
+let shaper = TrafficShaper::new(1_000_000.0)          // 1 MB/s aggregate
+    .with_reservation(Priority::Critical, 0.2);       // 20% reserved
+```
+
+Charging is all-or-nothing: a packet that must wait is charged nothing, so
+partial deductions can't accumulate and stall a stream.
+
+## Metrics
+
+`SchedulerMetrics` is an immutable snapshot rather than a live reference, so a
+caller computing several derived figures sees one consistent moment. It reports
+counts for enqueued, dispatched, rejected, dropped, shaped, retried, and
+acknowledged packets, bytes split between first sends and retransmissions, and
+instantaneous pending/in-flight/awaiting-retry depths.
+
+`retransmission_ratio()` is the health signal worth watching: a rising value
+means the link is losing packets or the retry timeout is too aggressive.
 
 ## Weighted, not strict
 
