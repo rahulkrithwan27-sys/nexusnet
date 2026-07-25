@@ -1,0 +1,18 @@
+[package]
+name = "nexusnet-transport"
+description = "Transport-layer connectivity for NexusNet: TCP, UDP, QUIC, WebSocket, HTTP/2 and HTTP/3."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]

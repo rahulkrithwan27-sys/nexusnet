@@ -1,0 +1,24 @@
+# Clippy configuration for the NexusNet workspace.
+#
+# The lint *levels* live in the root `Cargo.toml` under `[workspace.lints]`;
+# this file only tunes individual lint behavior.
+
+# Keep Clippy's suggestions compatible with our minimum supported Rust version
+# so it never proposes APIs newer than we support.
+msrv = "1.75"
+
+# Product, protocol, and library names that legitimately contain intra-word
+# capitalization. Without this list, `clippy::doc_markdown` would flag every
+# mention of them in doc comments as "missing backticks". The leading `".."`
+# extends Clippy's built-in default list rather than replacing it.
+doc-valid-idents = [
+    "..",
+    "NexusNet",
+    "MessagePack",
+    "ChaCha20",
+    "ChaCha20-Poly1305",
+    "Poly1305",
+    "AES-GCM",
+    "WebSocket",
+    "T-digest",
+]

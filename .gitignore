@@ -1,0 +1,31 @@
+# Compiled artifacts
+/target
+**/*.rs.bk
+
+# Backend/dashboard build output (added in later phases)
+/dashboard/node_modules
+/dashboard/dist
+
+# SDK build artifacts
+/sdk/**/build
+/sdk/**/dist
+/sdk/python/*.egg-info
+/sdk/python/.venv
+/sdk/flutter/.dart_tool
+
+# Criterion benchmark output
+/target/criterion
+
+# Editor / OS noise
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Environment files
+.env
+.env.*
+
+# Note: Cargo.lock IS committed. This workspace produces binaries
+# (nexusnet CLI), and a committed lockfile also documents the exact
+# MSRV-compatible dependency versions we verify against.

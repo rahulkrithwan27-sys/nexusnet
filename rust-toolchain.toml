@@ -1,0 +1,11 @@
+# Pins the toolchain used to build NexusNet so every contributor and CI runner
+# uses the same compiler. `rustup` reads this file automatically and installs
+# the pinned version and components on first use.
+#
+# The pinned version is intentionally newer than the crate's declared MSRV
+# (`rust-version = "1.75"` in Cargo.toml); the MSRV is the *minimum* we support,
+# while this is the version we develop and release against.
+[toolchain]
+channel = "1.83.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

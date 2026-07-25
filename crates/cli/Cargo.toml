@@ -1,0 +1,23 @@
+[package]
+name = "nexusnet-cli"
+description = "Command-line interface for inspecting and operating the NexusNet engine."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords.workspace = true
+categories.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "nexusnet"
+path = "src/main.rs"
+
+[dependencies]
+nexusnet-core = { workspace = true }

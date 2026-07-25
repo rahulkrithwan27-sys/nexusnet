@@ -1,0 +1,102 @@
+# NexusNet — Cargo workspace root.
+#
+# This is a *virtual* workspace: the root has no package of its own, it only
+# ties together the member crates under `crates/`. Shared metadata, dependency
+# versions, and lint configuration are declared once here and inherited by each
+# member via `field.workspace = true`.
+
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+# ---------------------------------------------------------------------------
+# Package metadata shared by every crate in the workspace.
+# Members opt in with e.g. `version.workspace = true` in their `[package]`.
+# ---------------------------------------------------------------------------
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+authors = ["The NexusNet Authors <maintainers@nexusnet.dev>"]
+repository = "https://github.com/nexusnet/nexusnet"
+homepage = "https://github.com/nexusnet/nexusnet"
+documentation = "https://docs.rs/nexusnet-core"
+readme = "README.md"
+keywords = ["networking", "async", "performance", "quic", "compression"]
+categories = ["network-programming", "asynchronous"]
+
+# ---------------------------------------------------------------------------
+# Shared dependency versions. Members reference these with `{ workspace = true }`
+# so the whole workspace stays on a single, consistent version of each crate.
+#
+# Only dependencies that are actually referenced by a member are compiled;
+# declaring a version here does not by itself pull anything in.
+# ---------------------------------------------------------------------------
+[workspace.dependencies]
+# --- Internal crates (path + version so they can also be published) ---
+nexusnet-core = { path = "crates/core", version = "0.1.0" }
+nexusnet-transport = { path = "crates/transport", version = "0.1.0" }
+nexusnet-compression = { path = "crates/compression", version = "0.1.0" }
+nexusnet-serializer = { path = "crates/serializer", version = "0.1.0" }
+nexusnet-encryption = { path = "crates/encryption", version = "0.1.0" }
+nexusnet-cache = { path = "crates/cache", version = "0.1.0" }
+nexusnet-scheduler = { path = "crates/scheduler", version = "0.1.0" }
+nexusnet-analytics = { path = "crates/analytics", version = "0.1.0" }
+nexusnet-optimizer = { path = "crates/optimizer", version = "0.1.0" }
+nexusnet-protocol = { path = "crates/protocol", version = "0.1.0" }
+nexusnet-router = { path = "crates/router", version = "0.1.0" }
+nexusnet-telemetry = { path = "crates/telemetry", version = "0.1.0" }
+nexusnet-plugin-api = { path = "crates/plugin_api", version = "0.1.0" }
+
+# --- Async runtime & IO primitives (used from later phases onward) ---
+tokio = { version = "1.38", features = ["rt-multi-thread", "macros", "net", "io-util", "time", "sync", "signal"] }
+bytes = "1.6"
+
+# --- Observability ---
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+
+# --- Serialization ---
+serde = { version = "1.0", features = ["derive"] }
+
+# --- Error handling ---
+thiserror = "2.0"
+
+# --- Testing & benchmarking ---
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# ---------------------------------------------------------------------------
+# Workspace-wide lint policy. Every member enables this with
+# `[lints] workspace = true`. CI runs clippy with `-D warnings`, so these
+# `warn` levels become hard errors in the pipeline while staying non-fatal
+# for local `cargo build`.
+# ---------------------------------------------------------------------------
+[workspace.lints.rust]
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+doc_markdown = "warn"
+
+# ---------------------------------------------------------------------------
+# Release profile tuned for a networking framework: thin LTO and a single
+# codegen unit trade compile time for runtime throughput on the hot path.
+# ---------------------------------------------------------------------------
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "unwind"
+strip = "debuginfo"
+
+[profile.bench]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
